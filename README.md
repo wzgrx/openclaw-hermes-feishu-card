@@ -1,3 +1,4 @@
+⚠️ This repository has been archived. All functionality has been merged into [openclaw-hermes-card](https://github.com/wzgrx/openclaw-hermes-card).
 # OpenClaw Feishu Card Footer — 飞书卡片页脚增强
 
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-v2026.5.20-blue)](https://openclaw.nousresearch.com)

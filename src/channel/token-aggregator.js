@@ -171,7 +171,9 @@ class TokenAggregator {
                 output.scannedFiles = existing.scannedFiles;
             }
             // Atomic write
-            (0, fs_1.writeFileSync)(this.tokenStatsPath, JSON.stringify(output, null, 2), 'utf8');
+            var _aggTmp = this.tokenStatsPath + '.tmp';
+            (0, fs_1.writeFileSync)(_aggTmp, JSON.stringify(output, null, 2), 'utf8');
+            (0, fs_1.renameSync)(_aggTmp, this.tokenStatsPath);
             this.log.debug(`flushed: eventPathToday=${eventPathToday}, daemonToday=${currentDaemonToday}, global=${globalToday}, month=${globalMonth}, sessions=${this._sessionTotals.size}`);
         }
         catch (err) {

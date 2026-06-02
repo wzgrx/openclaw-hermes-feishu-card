@@ -243,7 +243,9 @@ function flushStats(tokenStatsPath) {
             updatedAt: new Date().toISOString(),
             source: 'token-aggregator-daemon',
         };
-        (0, fs_1.writeFileSync)(tokenStatsPath, JSON.stringify(output, null, 2), 'utf8');
+        var _daemonTmp = tokenStatsPath + '.tmp';
+        (0, fs_1.writeFileSync)(_daemonTmp, JSON.stringify(output, null, 2), 'utf8');
+        (0, fs_1.renameSync)(_daemonTmp, tokenStatsPath);
         log.debug(`flush: daemonToday=${daemonToday}, prev=${prevDaemonToday}, global=${globalToday}`);
     }
     catch (err) {
