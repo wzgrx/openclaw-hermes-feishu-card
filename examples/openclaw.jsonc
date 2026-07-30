@@ -1,0 +1,51 @@
+{
+  "channels": {
+    "feishu": {
+      "enabled": true,
+      "streaming": false,
+      // appId/appSecret 可继续使用现有配置或 FEISHU_APP_ID/FEISHU_APP_SECRET
+    },
+  },
+  "plugins": {
+    "entries": {
+      "openclaw-feishu-card-footer": {
+        "enabled": true,
+        "config": {
+          "enabled": true,
+          "captureChannels": ["feishu", "openclaw-lark"],
+          "timezone": "Asia/Shanghai",
+          "storageDir": "~/.local/share/feishu-card-footer",
+          "updateIntervalMs": 800,
+          "panels": {
+            "reasoning": true,
+            "tools": true,
+            "progress": true,
+            "resources": true,
+            "footer": true,
+          },
+          "footer": {
+            "status": true,
+            "elapsed": true,
+            "firstToken": true,
+            "model": true,
+            "tokens": true,
+            "cache": true,
+            "context": true,
+            "cost": true,
+            "totals": true,
+          },
+          "pricing": [
+            {
+              "pattern": "openrouter/qwen-*",
+              "currency": "USD",
+              "inputPerMillion": 0.2,
+              "outputPerMillion": 0.8,
+              "cacheReadPerMillion": 0.02,
+              "cacheWritePerMillion": 0.2,
+            },
+          ],
+        },
+      },
+    },
+  },
+}

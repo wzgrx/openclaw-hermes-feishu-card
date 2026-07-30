@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling>=1.31"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hermes-feishu-card-footer"
+version = "1.0.0"
+description = "Hermes Feishu CardKit adapter with streaming progress and runtime footer metrics"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = { text = "MIT" }
+authors = [{ name = "wzgrx" }]
+keywords = ["hermes-agent", "feishu", "lark", "cardkit", "streaming-card"]
+dependencies = [
+  "lark-oapi>=1.7.1,<2",
+  "tzdata>=2025.3,<2027"
+]
+
+[project.optional-dependencies]
+hermes = [
+  "hermes-agent>=0.19.0,<0.20"
+]
+dev = [
+  "build>=1.5,<2",
+  "mypy>=2.3,<3",
+  "pytest>=9.1.1,<10",
+  "pytest-asyncio>=1.4,<2",
+  "ruff>=0.16,<0.17"
+]
+
+[project.scripts]
+hermes-feishu-card-footer = "hermes_feishu_card_footer.cli:main"
+
+[project.entry-points."hermes_agent.plugins"]
+hermes-feishu-card-footer = "hermes_feishu_card_footer"
+
+[tool.hatch.build.targets.wheel]
+packages = ["hermes_feishu_card_footer"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"hermes_feishu_card_footer/plugin.yaml" = "hermes_feishu_card_footer/plugin.yaml"
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests_py"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF002", "RUF003"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+explicit_package_bases = true
+exclude = ["tests_py"]
+
+[[tool.mypy.overrides]]
+module = ["gateway.*", "plugins.*", "lark_oapi.*"]
+ignore_missing_imports = true

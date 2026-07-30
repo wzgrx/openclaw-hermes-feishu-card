@@ -1,200 +1,172 @@
-⚠️ This repository has been archived. All functionality has been merged into [openclaw-hermes-card](https://github.com/wzgrx/openclaw-hermes-card).
-# OpenClaw Feishu Card Footer — 飞书卡片页脚增强
+# OpenClaw / Hermes 飞书 CardKit 插件
 
-[![OpenClaw](https://img.shields.io/badge/OpenClaw-v2026.5.20-blue)](https://openclaw.nousresearch.com)
-[![@larksuite/openclaw-lark](https://img.shields.io/badge/%40larksuite%2Fopenclaw--lark-v2026.5.20-green)](https://www.npmjs.com/package/@larksuite/openclaw-lark)
-[![Node.js](https://img.shields.io/badge/Node.js-LTS-339933)](https://nodejs.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[English](README.en.md) · [架构](docs/architecture.md) · [配置](docs/configuration.md) · [迁移](docs/migration.md)
 
-**OpenClaw** × **飞书 (Feishu/Lark)** 飞书卡片多面板增强组件。
-**适配 OpenClaw 核心 v2026.5.20 + @larksuite/openclaw-lark@2026.5.20。**
-提供 4 个可折叠信息面板，覆盖系统资源监控、工具执行进度、Token 统计、费用分解等完整 AI 对话指标。
+一个仓库、两套原生集成：
 
----
+- **OpenClaw / 龙虾**：TypeScript 插件，通过公开 Hook 接管飞书文本回复，使用 CardKit 2.0 创建和更新同一张卡片。
+- **Hermes Agent**：Python 平台插件，继承 Hermes 原生 `FeishuAdapter`，保留 WebSocket、权限、附件、线程和命令能力，只替换回答的展示层。
 
-## 📌 版本说明
+它把回答、工具步骤、任务进度、思考摘要、主机资源、模型、Token、缓存、上下文和费用统计集中在一张流式卡片中。
 
-| 简称 | 全称 | 说明 |
-|------|------|------|
-| **OpenClaw v5.20** | **OpenClaw 核心** `v2026.5.20` | 当前适配版本 |
-| **插件 v2026.5.20** | **`@larksuite/openclaw-lark@2026.5.20`** | 适配 OpenClaw v2026.5.20 |
+## 设计特点
 
-## 🖥️ 基础环境要求
+- 不复制、不覆盖 `@larksuite/openclaw-lark` 或 Hermes 源码。
+- CardKit 2.0 全量更新，严格递增 `sequence`，结束时关闭流式状态。
+- 投递失败时保留上游原生文本链路。
+- 工具进度与回答共用卡片；媒体、审批、文件、语音继续走原生通道。
+- OpenClaw 与 Hermes 可写入同一份追加式 `usage.ndjson`。
+- App Secret 只从现有运行时配置或环境变量读取，日志中不输出凭据。
+- 中文/英文卡片标题与摘要，默认时区为 `Asia/Shanghai`。
 
-| 组件 | 要求 |
-|------|------|
-| **操作系统** | Linux / WSL2 Ubuntu |
-| **OpenClaw** | `v2026.5.20` |
-| **Node.js** | v24.15+ |
-| **飞书插件** | `@larksuite/openclaw-lark@2026.5.20` |
+## 兼容基线
 
-### 插件安装
+| 组件                       | 基线                              |
+| -------------------------- | --------------------------------- |
+| OpenClaw                   | `2026.7.1-2`（兼容 `>=2026.7.1`） |
+| `@larksuite/openclaw-lark` | `2026.7.16`                       |
+| Hermes Agent               | `>= 0.19.0, < 0.20`               |
+| Node.js                    | 22 / 24 / 25 的 OpenClaw 支持版本 |
+| pnpm                       | `11.18.0`                         |
+| TypeScript                 | `6.0.3`（当前工具链最新兼容版）   |
+| Python                     | 3.11–3.13                         |
+| Feishu Node SDK            | `@larksuiteoapi/node-sdk ^1.72.0` |
+| Feishu Python SDK          | `lark-oapi >=1.7.1,<2`            |
 
-```bash
-npm install -g @larksuite/openclaw-lark@latest
-cp -a /path/to/node_modules/@larksuite/openclaw-lark ~/.openclaw/extensions/openclaw-lark
-```
+## 快速开始
 
-## 🎯 功能特性
-
-卡片包含 4 个可折叠信息面板，展开/折叠自由控制：
-
-```
-┌─ 🖥️ 系统资源  [可折叠·折叠] ──────────────────┐
-│ GPU 利用率 · VRAM · 温度 · CPU · 内存占用      │
-│ 进程 · 系统已运行时间                          │
-├─ 🛠️ 工具步骤  [可折叠·折叠] ──────────────────┤
-│ 工具调用详情（参数、结果、输出）               │
-├─ 📊 任务进度  [可折叠·展开] ──────────────────┤
-│ ████████████████ 100%                         │
-│ 🛠️ 工具执行 · 3 次                            │
-│  ■ Search web (1.5s) ✔                        │
-│  ■ Edit (2.3s) ✔                              │
-├─ [回复内容] ──────────────────────────────────┤
-├─ 🪙 deepseek-v4-flash · ¥388.25 [可折叠·折叠] ┤
-│ 🪙Token 今/月/总: ...                          │
-│ ✅ 已完成 · ⏳️ ...                             │
-│ 💸 ¥...                                        │
-│ 📑 ...                                         │
-│ 💰 ...                                         │
-└────────────────────────────────────────────────┘
-```
-
-### 面板说明
-
-| 面板 | 内容 | 默认状态 |
-|:----|:----|:--------|
-| 🖥️ 系统资源 | GPU利用率/显存/温度、CPU、内存、运行时间 | 折叠 |
-| 🛠️ 工具步骤 | 工具调用参数、结果、输出（原生功能） | 折叠 |
-| 📊 任务进度 | 总进度条 + 百分比 + 每步耗时/状态 | 展开 |
-| 🪙 统计信息 | Token统计、费用分解、上下文、模型余额 | 折叠 |
-
-## 🔧 适配方式
-
-本项目采用 **直接源码覆盖** 方式适配。
-
-### 文件清单
-
-**修改的文件：**
-
-| 文件 | 修改内容 |
-|------|----------|
-| `src/card/builder.js` | 4 面板卡片渲染（系统资源 + 任务进度 + 6-line 页脚 + 全部可折叠） |
-| `src/card/streaming-card-controller.js` | `computeToolUseDisplay()` 始终返回步骤数据 |
-| `src/card/reply-dispatcher.js` | `onIdle` 确保 complete card 始终构建 |
-| `src/card/reply-mode.js` | 群聊启用流式卡片 |
-| `src/card/tool-use-trace-store.js` | 新增 `getToolUseTraceStore()` 运行时遍历 |
-| `src/channel/event-bus.js` | Token 事件发布总线 |
-| `src/channel/token-aggregator.js` | Token 聚合服务 |
-| `src/channel/token-aggregator-daemon.js` | Token 聚合守护进程 |
-| `src/channel/monitor.js` | TokenAggregator 启动 |
-| `src/core/footer-config.js` | 默认值全 `true` |
-
-### 部署步骤
+### 1. 构建
 
 ```bash
-# 1. 安装最新插件
-npm install -g @larksuite/openclaw-lark@latest
-cp -a /path/to/node_modules/@larksuite/openclaw-lark ~/.openclaw/extensions/openclaw-lark
-
-# 2. 覆盖源码
-# 方式一：手动复制
-# cp src/card/*.js ~/.openclaw/extensions/openclaw-lark/src/card/
-# cp src/channel/*.js ~/.openclaw/extensions/openclaw-lark/src/channel/  (可选，token统计)
-# cp src/core/*.js ~/.openclaw/extensions/openclaw-lark/src/core/  (可选，footer配置)
-# 方式二：使用部署脚本 (推荐)
-# bash deploy.sh
-
-# 3. 配置 verbose（必须！否则进度面板不显示）
-openclaw config set agents.defaults.verboseDefault on
-
-# 4. 重启网关
-systemctl --user restart openclaw-gateway
+corepack enable 2>/dev/null || npm install --global pnpm@11.18.0
+pnpm install --frozen-lockfile
+pnpm check
 ```
 
-# 4. 重启 gateway
-systemctl --user restart openclaw-gateway
-```
-
-### 快速部署脚本
+Python：
 
 ```bash
-# 从 GitHub 拉取并部署
-git clone https://github.com/wzgrx/openclaw-feishu-card-footer.git
-cd openclaw-feishu-card-footer
-cp -r src/* ~/.openclaw/extensions/openclaw-lark/src/
-rm -rf ~/.openclaw/extensions/openclaw-lark/node_modules/.cache/jiti/
-systemctl --user restart openclaw-gateway
+python -m venv .venv
+source .venv/bin/activate
+pip install -e '.[hermes,dev]'
+ruff check .
+pytest
 ```
 
-## 📊 数据流架构
-
-```
-Agent回复 → streaming-card-controller.onIdle()
-  ├─ getFooterSessionMetrics() → 读取 session store
-  ├─ _publishTokenEvent(footerMetrics)
-  │    └─ event-bus.publish → TokenAggregator → token-stats.json
-  └─ buildCardContent('complete', { footerMetrics, firstTokenLatencyMs })
-       ├─ 读取 ~/.openclaw/token-stats.json（🪙 全局Token统计）
-       ├─ 读取 ~/.hermes/data/balance-cache.json（💰 累计费用）
-       └─ 渲染 6-line footer → updateCardKitCard()
-```
-
-### 配置文件参考
-
-`~/.openclaw/openclaw.json` 中飞书通道配置：
-
-```json
-{
-  "channels": {
-    "feishu": {
-      "appId": "cli_xxx",
-      "appSecret": "xxx",
-      "enabled": true,
-      "streaming": true,
-      "footer": {
-        "status": true,
-        "elapsed": true,
-        "tokens": true,
-        "cache": true,
-        "context": true,
-        "model": true,
-        "cost": true,
-        "todayTokens": true,
-        "monthTokens": true
-      },
-      "replyMode": "auto"
-    }
-  }
-}
-```
-
-## 🧹 维护
-
-### 更新后清缓存
+### 2. 安装到 OpenClaw
 
 ```bash
-rm -rf ~/.openclaw/extensions/openclaw-lark/node_modules/.cache/jiti/
-systemctl --user restart openclaw-gateway
+pnpm build
+openclaw plugins install --link .
+openclaw plugins enable openclaw-feishu-card-footer
+openclaw plugins doctor
 ```
 
-### 查看日志
+将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。建议把飞书原通道的 `streaming` 设为 `false`，由本插件统一渲染卡片。
+
+### 3. 安装到 Hermes
+
+仓库发布后：
 
 ```bash
-journalctl --user -u openclaw-gateway -f | grep "card\|footer"
+hermes plugins install wzgrx/openclaw-feishu-card-footer --enable
+HERMES_BIN="$(readlink -f "$(command -v hermes)")"
+HERMES_PYTHON="$(dirname "$HERMES_BIN")/python"
+"$HERMES_PYTHON" -m pip install -e ~/.hermes/plugins/feishu-platform
+hermes plugins list
 ```
 
-## 🔄 版本迁移历史
+本地 WSL 开发：
 
-| 时间 | 旧版 | 新版 | 主要变更 |
-|------|------|------|----------|
-| 2026-05-20 | `2026.5.13` | `2026.5.20-beta.0` | 完整重写适配：新增 `formatFooterRuntimeSegments`、`_publishTokenEvent`、TokenAggregator、群聊流式修复、首token延迟追踪 |
-| 2026-05-13 | `2026.4.10` | `2026.5.13` | 安装方式改为 `npx install`，插件路径改为 `extensions/` 目录 |
-| 2026-05-07 | `2026.4.10` | `2026.5.7` | 5.7 完整重写，引入 event-bus + token-aggregator 事件链 |
-| 2026-05-03 | `v5.6` | `2026.4.10` | 6-line 格式定型，分开 `本次上下文` vs `↑↓ token` |
-| 2026-04-xx | `v5.3` | `v5.6` | 新增首token延迟、余额显示、模型注册表 |
-| 2026-04-xx | — | `v5.3` | 首个版本：飞书卡片 Footer 增强 |
+```bash
+bash scripts/install-wsl.sh --hermes
+```
 
-## 📄 License
+将 [`examples/hermes-config.yaml`](examples/hermes-config.yaml) 合并到 `~/.hermes/config.yaml`，然后：
+
+```bash
+hermes gateway restart
+"$HERMES_PYTHON" -m hermes_feishu_card_footer.cli doctor
+```
+
+### 4. 同时安装两端
+
+在 WSL 的仓库目录执行：
+
+```bash
+bash scripts/install-wsl.sh --all --restart
+```
+
+也可从 Windows PowerShell 执行：
+
+```powershell
+.\scripts\install-wsl.ps1 -Target all -Distribution Ubuntu-26.04 -Restart
+```
+
+安装脚本优先选择 WSL 内 `nvm` 的 OpenClaw 与当前 `hermes` 可执行文件旁的
+Python，避开 Windows PATH 互操作中的同名命令。
+
+## 配置概览
+
+OpenClaw 插件配置位于：
+
+```text
+plugins.entries.openclaw-feishu-card-footer.config
+```
+
+Hermes 插件配置位于：
+
+```text
+platforms.feishu.card_footer
+```
+
+两个运行时使用相同概念：
+
+- `storageDir` / `storage_dir`
+- `timezone`
+- `updateIntervalMs` / `update_interval_ms`
+- `panels`
+- `footer`
+- `pricing`
+
+完整字段见 [配置说明](docs/configuration.md)。
+
+## 开发命令
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm build
+
+.venv/bin/ruff check .
+.venv/bin/mypy hermes_feishu_card_footer
+.venv/bin/pytest
+```
+
+## 仓库结构
+
+```text
+src/core/                       共享 TypeScript 状态、定价、账本与渲染
+src/openclaw/                   OpenClaw Hook 与 Feishu Node SDK 桥接
+hermes_feishu_card_footer/      Hermes 平台适配器与 CardKit Python SDK 桥接
+tests/                          TypeScript 单元测试
+tests_py/                       Python 单元测试
+examples/                       两端配置示例
+scripts/                        WSL 安装、诊断与校验脚本
+docs/                           架构、迁移、兼容与测试说明
+```
+
+## 参考实现
+
+重构吸收了以下项目的成熟设计，但重新实现了状态层和双运行时适配：
+
+- [larksuite/openclaw-lark](https://github.com/larksuite/openclaw-lark)
+- [Cheerwhy/hermes-lark-streaming](https://github.com/Cheerwhy/hermes-lark-streaming)
+- [baileyh8/hermes-feishu-streaming-card](https://github.com/baileyh8/hermes-feishu-streaming-card)
+- [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
+- [openclaw/openclaw](https://github.com/openclaw/openclaw)
+
+## License
 
 MIT

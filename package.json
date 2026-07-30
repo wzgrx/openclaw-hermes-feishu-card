@@ -1,0 +1,85 @@
+{
+  "name": "openclaw-feishu-card-footer",
+  "version": "1.0.0",
+  "description": "Feishu CardKit streaming cards and runtime metrics for OpenClaw and Hermes",
+  "type": "module",
+  "license": "MIT",
+  "author": "wzgrx",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wzgrx/openclaw-feishu-card-footer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wzgrx/openclaw-feishu-card-footer/issues"
+  },
+  "homepage": "https://github.com/wzgrx/openclaw-feishu-card-footer#readme",
+  "keywords": [
+    "openclaw",
+    "hermes-agent",
+    "feishu",
+    "lark",
+    "cardkit",
+    "streaming-card"
+  ],
+  "engines": {
+    "node": ">=22.22.3 <23 || >=24.15.0 <25 || >=25.9.0"
+  },
+  "packageManager": "pnpm@11.18.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.mts",
+      "import": "./dist/core/index.mjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist/",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "doctor": "node scripts/doctor.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint src tests",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.72.0",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.7.1"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.1.2",
+    "eslint": "^10.8.0",
+    "openclaw": "^2026.7.1-2",
+    "prettier": "^3.9.6",
+    "tsdown": "^0.22.14",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.mjs"
+    ]
+  }
+}

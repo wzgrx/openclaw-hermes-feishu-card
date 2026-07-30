@@ -1,0 +1,80 @@
+{
+  "id": "openclaw-feishu-card-footer",
+  "name": "OpenClaw Feishu Card Footer",
+  "description": "One CardKit reply with tool progress, runtime resources, token totals and cost metrics.",
+  "version": "1.0.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true
+      },
+      "captureChannels": {
+        "type": "array",
+        "items": { "type": "string" },
+        "default": ["feishu"]
+      },
+      "timezone": {
+        "type": "string",
+        "default": "Asia/Shanghai"
+      },
+      "storageDir": {
+        "type": "string"
+      },
+      "updateIntervalMs": {
+        "type": "integer",
+        "minimum": 250,
+        "maximum": 10000,
+        "default": 800
+      },
+      "panels": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reasoning": { "type": "boolean", "default": true },
+          "tools": { "type": "boolean", "default": true },
+          "progress": { "type": "boolean", "default": true },
+          "resources": { "type": "boolean", "default": true },
+          "footer": { "type": "boolean", "default": true }
+        }
+      },
+      "footer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": { "type": "boolean", "default": true },
+          "elapsed": { "type": "boolean", "default": true },
+          "firstToken": { "type": "boolean", "default": true },
+          "model": { "type": "boolean", "default": true },
+          "tokens": { "type": "boolean", "default": true },
+          "cache": { "type": "boolean", "default": true },
+          "context": { "type": "boolean", "default": true },
+          "cost": { "type": "boolean", "default": true },
+          "totals": { "type": "boolean", "default": true }
+        }
+      },
+      "pricing": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["pattern", "inputPerMillion", "outputPerMillion"],
+          "additionalProperties": false,
+          "properties": {
+            "pattern": { "type": "string" },
+            "currency": {
+              "type": "string",
+              "enum": ["CNY", "USD"],
+              "default": "CNY"
+            },
+            "inputPerMillion": { "type": "number", "minimum": 0 },
+            "outputPerMillion": { "type": "number", "minimum": 0 },
+            "cacheReadPerMillion": { "type": "number", "minimum": 0 },
+            "cacheWritePerMillion": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    }
+  }
+}

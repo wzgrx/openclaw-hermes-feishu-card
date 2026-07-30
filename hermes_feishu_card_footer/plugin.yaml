@@ -1,0 +1,32 @@
+name: feishu-platform
+label: Feishu / Lark · CardKit
+kind: platform
+version: 1.0.0
+description: >
+  Feishu CardKit 2.0 streaming presentation for Hermes Agent. Extends Hermes'
+  native Feishu transport with unified answer, tool progress, resource and
+  token/cost panels.
+author: wzgrx
+pip_dependencies:
+  - "lark-oapi>=1.7.1,<2"
+  - "tzdata>=2025.3,<2027"
+requires_env:
+  - name: FEISHU_APP_ID
+    description: "Feishu/Lark app ID"
+    prompt: "Feishu App ID"
+    url: "https://open.feishu.cn/"
+    password: false
+  - name: FEISHU_APP_SECRET
+    description: "Feishu/Lark app secret"
+    prompt: "Feishu App Secret"
+    url: "https://open.feishu.cn/"
+    password: true
+optional_env:
+  - name: FEISHU_DOMAIN
+    description: "Domain: feishu or lark"
+    prompt: "Domain (feishu/lark)"
+    password: false
+  - name: FEISHU_CARD_FOOTER_HOME
+    description: "Shared usage ledger directory"
+    prompt: "Card footer data directory"
+    password: false

@@ -1,0 +1,19 @@
+packages:
+  - .
+
+allowBuilds:
+  "@google/genai": false
+  openclaw: true
+  protobufjs: true
+  tree-sitter-bash: true
+
+# The repository intentionally tracks current releases instead of pnpm 11's
+# default 24-hour publication delay. Integrity remains pinned by pnpm-lock.yaml.
+minimumReleaseAge: 0
+
+# Rolldown 1.1.x and 1.2.x share this runtime. Version 1.2.1 supports both
+# @emnapi 1.x and 2.x peers, avoiding an invalid peer split on fresh installs.
+overrides:
+  "@napi-rs/wasm-runtime": 1.2.1
+  # Patched node-tar release for OpenClaw's development-only file tooling.
+  tar: 7.5.22
