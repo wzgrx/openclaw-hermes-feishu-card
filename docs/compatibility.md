@@ -9,6 +9,7 @@
 | Hermes Agent    | 0.19.x    | 已验证 PyPI 0.19.0 与源码标签 0.19.1                         |
 | 飞书 Node SDK   | 1.72.x    | CardKit v1、IM v1                                            |
 | 飞书 Python SDK | 1.6.8–1.x | CardKit v1、IM v1                                            |
+| lark-cli        | 1.0.80+   | raw API、JSON envelope、dry-run、bot 环境凭据                |
 
 ## 通道职责
 
@@ -26,7 +27,12 @@
 `@larksuite/openclaw-lark` 2026.7.16 的 direct dispatcher 不经过跨插件
 `reply_payload_sending` 修改器。安装器会为该组合写入
 `streaming=true`、`replyMode="streaming"`，由其原生 CardKit controller 保证
-OpenClaw 回复为卡片；标准 routed delivery 与 Hermes 仍由本项目的桥接层渲染。
+OpenClaw 回复为卡片，并把 `status/elapsed/tokens/cache/context/model` 同步到
+通道原生 Footer；标准 routed delivery 与 Hermes 仍由本项目的桥接层渲染。
+
+官方 lark-cli 适配器不替代在线回复通道。它通过 raw API 验证“应用凭据 →
+CardKit 创建 → IM 发送 → 内容更新 → 关闭流式状态”全链路，默认仅执行
+dry-run，适合安装器和 Agent 诊断。
 
 ## 旧项目功能移植
 

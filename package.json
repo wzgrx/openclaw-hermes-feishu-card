@@ -33,12 +33,17 @@
     "./core": {
       "types": "./dist/core/index.d.mts",
       "import": "./dist/core/index.mjs"
+    },
+    "./lark-cli": {
+      "types": "./dist/lark-cli/index.d.mts",
+      "import": "./dist/lark-cli/index.mjs"
     }
   },
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "files": [
     "dist/",
+    "scripts/",
     "openclaw.plugin.json",
     "README.md",
     "LICENSE"
@@ -46,6 +51,7 @@
   "scripts": {
     "balance:check": "node scripts/balance-check.mjs",
     "build": "tsdown",
+    "card:smoke:lark-cli": "node scripts/lark-cli-cardkit.mjs",
     "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "compat:openclaw": "node scripts/verify-openclaw-runtime.mjs",
     "compat:openclaw:beta": "node scripts/verify-openclaw-runtime.mjs --plugin-only",

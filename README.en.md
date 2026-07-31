@@ -1,9 +1,10 @@
 # Feishu CardKit for OpenClaw and Hermes
 
-A hybrid repository with native integrations for both runtimes:
+A hybrid repository with two native integrations and one official CLI verification transport:
 
 - A TypeScript OpenClaw plugin using the public reply and tool hooks.
 - A Python Hermes platform plugin extending Hermes' native `FeishuAdapter`.
+- A `larksuite/cli` raw-API adapter for structured CardKit dry-runs and live lifecycle smoke tests.
 
 Both render answer text, tool progress, runtime metrics, token usage and configured cost estimates in one CardKit 2.0 message. Media, files, voice, approvals, commands and inbound transport remain owned by the upstream Feishu channel adapters.
 
@@ -27,6 +28,16 @@ OpenClaw:
 pnpm build
 openclaw plugins install --link .
 openclaw plugins enable openclaw-hermes-feishu-card
+pnpm run doctor -- --runtime
+```
+
+Official lark-cli CardKit probe:
+
+```bash
+bash scripts/install-wsl.sh --lark-cli
+pnpm build
+pnpm card:smoke:lark-cli
+pnpm card:smoke:lark-cli -- --live --chat-id oc_xxx
 ```
 
 Hermes:
@@ -55,6 +66,7 @@ See [configuration](docs/configuration.md), [architecture](docs/architecture.md)
 - Fail-open delivery: native text remains active when card delivery fails.
 - Append-only NDJSON usage storage shared across runtimes.
 - Credentials are resolved from the host configuration or environment.
+- Runtime diagnostics use structured output and lark-cli dry-runs; secrets are passed only through the child-process environment.
 
 ## License
 

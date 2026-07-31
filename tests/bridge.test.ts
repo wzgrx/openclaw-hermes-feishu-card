@@ -93,7 +93,10 @@ describe("OpenClaw card bridge delivery policy", () => {
 
     const result = await bridge.onReplyPayload(
       {
-        payload: { text: "done" },
+        payload: {
+          text: "done",
+          delivery: { pin: false },
+        },
         kind: "final",
         channel: "feishu",
         sessionKey: "session",

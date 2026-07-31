@@ -131,7 +131,6 @@ function needsNativeDelivery(payload: Record<string, unknown>): boolean {
     payload.presentation !== undefined ||
     payload.interactive !== undefined ||
     payload.channelData !== undefined ||
-    payload.delivery !== undefined ||
     payload.btw !== undefined ||
     payload.ttsSupplement !== undefined ||
     payload.isCompactionNotice === true ||

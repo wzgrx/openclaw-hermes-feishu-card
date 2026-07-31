@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Add an official `larksuite/cli` CardKit adapter with structured dry-run and
+  create/send/update/finalize smoke-test flows; credentials stay in the child
+  process environment rather than argv.
+- Expand `doctor` with JSON output, live OpenClaw configuration checks, native
+  CardKit/Footer repair, credential redaction and lark-cli raw-API probing.
+- Install or repair lark-cli from the WSL installer and synchronize the footer
+  subset supported by the `openclaw-lark` direct dispatcher.
+- Keep plain-text replies eligible for CardKit rendering when OpenClaw attaches
+  delivery routing metadata; rich/media payloads still remain native.
+
 - Force Gateway startup activation so hook-only CardKit delivery is present in
   the live Feishu inbound/reply pipeline instead of loading only in inspection
   and standalone CLI processes.

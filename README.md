@@ -2,10 +2,11 @@
 
 [English](README.en.md) · [架构](docs/architecture.md) · [配置](docs/configuration.md) · [兼容性](docs/compatibility.md) · [维护](docs/maintenance.md) · [迁移](docs/migration.md)
 
-一个仓库、两套原生集成：
+一个仓库、两套原生集成和一条官方 CLI 验证链路：
 
 - **OpenClaw / 龙虾**：TypeScript 插件，通过公开 Hook 接管飞书文本回复，使用 CardKit 2.0 创建和更新同一张卡片。
 - **Hermes Agent**：Python 平台插件，继承 Hermes 原生 `FeishuAdapter`，保留 WebSocket、权限、附件、线程和命令能力，只替换回答的展示层。
+- **lark-cli**：调用官方 `larksuite/cli` 的 raw API 层，提供凭据不进入命令行参数的 CardKit dry-run 和端到端烟雾测试。
 
 它把回答、工具步骤、任务进度、思考摘要、主机资源、模型、Token、缓存、上下文和费用统计集中在一张流式卡片中。
 
@@ -19,6 +20,7 @@
 - 支持多账户卡片标题、附件摘要、GPU、旧版后台任务和供应商余额缓存。
 - App Secret 只从现有运行时配置或环境变量读取，日志中不输出凭据。
 - 中文/英文卡片标题与摘要，默认时区为 `Asia/Shanghai`。
+- `doctor --runtime --fix` 可检测并修复 direct dispatcher、原生 Footer、插件启用和 lark-cli CardKit 路由。
 
 ## 兼容基线
 
@@ -33,6 +35,7 @@
 | Python                     | 3.11–3.13                               |
 | Feishu Node SDK            | `@larksuiteoapi/node-sdk ^1.72.0`       |
 | Feishu Python SDK          | `lark-oapi >=1.6.8,<2`                  |
+| lark-cli                   | `@larksuite/cli >=1.0.80`               |
 
 ## 快速开始
 
@@ -64,6 +67,27 @@ openclaw plugins doctor
 ```
 
 将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。使用 `@larksuite/openclaw-lark` 2026.7.x 时，将飞书通道设置为 `streaming: true`、`replyMode: "streaming"`；该版本的旧版 direct dispatcher 由通道原生 CardKit controller 负责最终卡片投递。
+
+运行时诊断和自动修复：
+
+```bash
+pnpm run doctor -- --runtime
+pnpm run doctor -- --runtime --fix
+```
+
+### 2.1 官方 lark-cli CardKit 验证
+
+安装器的 `--openclaw` / `--all` 会补装官方 CLI，也可单独执行：
+
+```bash
+bash scripts/install-wsl.sh --lark-cli
+pnpm build
+pnpm card:smoke:lark-cli                         # 只生成并检查 raw API 请求
+pnpm card:smoke:lark-cli -- --live --chat-id oc_xxx # 创建、发送、更新、关闭卡片
+```
+
+脚本优先读取 `LARKSUITE_CLI_APP_ID` / `LARKSUITE_CLI_APP_SECRET`，否则复用
+`~/.openclaw/openclaw.json` 的飞书应用配置；Secret 只放入子进程环境变量。
 
 ### 3. 安装到 Hermes
 
@@ -154,6 +178,7 @@ pnpm compat:openclaw
 ```text
 src/core/                       共享 TypeScript 状态、定价、账本与渲染
 src/openclaw/                   OpenClaw Hook 与 Feishu Node SDK 桥接
+src/lark-cli/                   官方 lark-cli raw API CardKit 传输与诊断
 openclaw_hermes_feishu_card/    Hermes 平台适配器与 CardKit Python SDK 桥接
 hermes_feishu_card_footer/      旧 Python 导入名和 CLI 的兼容转发层
 tests/                          TypeScript 单元测试
@@ -174,6 +199,10 @@ docs/                           架构、迁移、兼容与测试说明
 - [baileyh8/hermes-feishu-streaming-card](https://github.com/baileyh8/hermes-feishu-streaming-card)
 - [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
 - [openclaw/openclaw](https://github.com/openclaw/openclaw)
+- [larksuite/cli](https://github.com/larksuite/cli)：三层命令、raw API、dry-run、JSON envelope 和环境凭据注入
+- [larksuite/node-sdk](https://github.com/larksuite/node-sdk)：官方 CardKit/IM 类型与应用鉴权
+- [ET06731/opencode-im-bridge](https://github.com/ET06731/opencode-im-bridge)：串行 CardKit 生命周期、Token 失效重试和本地链接清理思路
+- [zeno528/openclaw-lark-streaming-patch](https://github.com/zeno528/openclaw-lark-streaming-patch)：更新队列、节流、重试与熔断设计参考
 
 ## License
 

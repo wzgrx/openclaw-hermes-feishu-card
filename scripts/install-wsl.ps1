@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [ValidateSet("all", "openclaw", "hermes")]
+  [ValidateSet("all", "openclaw", "hermes", "lark-cli")]
   [string]$Target = "all",
   [string]$Distribution = "Ubuntu-26.04",
   [switch]$Restart

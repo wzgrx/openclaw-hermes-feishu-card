@@ -6,6 +6,7 @@ NEW_PLUGIN_ID="openclaw-hermes-feishu-card"
 OLD_PLUGIN_ID="openclaw-feishu-card-footer"
 INSTALL_OPENCLAW=0
 INSTALL_HERMES=0
+INSTALL_LARK_CLI=0
 RESTART=0
 
 # Prefer native WSL runtimes over Windows PATH interop shims. This also
@@ -60,25 +61,39 @@ resolve_hermes_python() {
 
 usage() {
   cat <<'EOF'
-Usage: bash scripts/install-wsl.sh [--all|--openclaw|--hermes] [--restart]
+Usage: bash scripts/install-wsl.sh [--all|--openclaw|--hermes|--lark-cli] [--restart]
 EOF
 }
 
 if (($# == 0)); then
   INSTALL_OPENCLAW=1
   INSTALL_HERMES=1
+  INSTALL_LARK_CLI=1
 fi
 while (($#)); do
   case "$1" in
-    --all) INSTALL_OPENCLAW=1; INSTALL_HERMES=1 ;;
-    --openclaw) INSTALL_OPENCLAW=1 ;;
+    --all) INSTALL_OPENCLAW=1; INSTALL_HERMES=1; INSTALL_LARK_CLI=1 ;;
+    --openclaw) INSTALL_OPENCLAW=1; INSTALL_LARK_CLI=1 ;;
     --hermes) INSTALL_HERMES=1 ;;
+    --lark-cli) INSTALL_LARK_CLI=1 ;;
     --restart) RESTART=1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
   shift
 done
+
+if ((INSTALL_LARK_CLI)); then
+  command -v npm >/dev/null
+  if ! command -v lark-cli >/dev/null 2>&1 || ! lark-cli --version >/dev/null 2>&1; then
+    echo "Installing the official @larksuite/cli CardKit diagnostic transport."
+    (
+      cd /tmp
+      npm install -g @larksuite/cli@latest
+    )
+  fi
+  lark-cli --version
+fi
 
 if ((INSTALL_OPENCLAW)); then
   command -v node >/dev/null
@@ -119,6 +134,15 @@ const legacyStorageDirs = new Set([
 newEntry.enabled = true;
 newEntry.config = {
   ...pluginConfig,
+  captureChannels: [
+    ...new Set([
+      ...(Array.isArray(pluginConfig.captureChannels)
+        ? pluginConfig.captureChannels
+        : []),
+      "feishu",
+      "openclaw-lark",
+    ]),
+  ],
   title: pluginConfig.title ?? "OpenClaw",
   accountTitles: pluginConfig.accountTitles ?? {},
   storageDir:
@@ -137,6 +161,20 @@ newEntry.config = {
   },
 };
 config.plugins.entries[newId] = newEntry;
+if (config.channels.feishu && typeof config.channels.feishu === "object") {
+  const nativeFooterKeys = [
+    "status",
+    "elapsed",
+    "tokens",
+    "cache",
+    "context",
+    "model",
+  ];
+  config.channels.feishu.footer ??= {};
+  for (const key of nativeFooterKeys) {
+    config.channels.feishu.footer[key] = newEntry.config.footer[key] ?? true;
+  }
+}
 if (Array.isArray(config.plugins.allow)) {
   config.plugins.allow = [
     ...new Set(config.plugins.allow.filter((id) => id !== oldId).concat(newId)),
@@ -186,6 +224,7 @@ NODE
     openclaw plugins install --link --force .
     openclaw plugins enable "$NEW_PLUGIN_ID"
     openclaw plugins doctor
+    run_pnpm run doctor -- --runtime
   )
 fi
 
