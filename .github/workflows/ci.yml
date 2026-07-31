@@ -16,8 +16,8 @@ jobs:
       matrix:
         node: ["22.22.3", "24.15.0", "25.9.0"]
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.18.0
       - uses: actions/setup-node@v6
@@ -30,7 +30,7 @@ jobs:
       - run: pnpm run doctor
       - run: pnpm pack --pack-destination artifacts
         if: matrix.node == '24.15.0'
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: matrix.node == '24.15.0'
         with:
           name: npm-package
@@ -43,8 +43,8 @@ jobs:
       matrix:
         python: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -60,7 +60,7 @@ jobs:
           python -m pip install 'lark-oapi==1.6.8'
           pytest tests_py/test_client.py tests_py/test_hermes_runtime.py
       - run: python -m build
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: matrix.python == '3.12'
         with:
           name: python-package

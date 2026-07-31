@@ -11,15 +11,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.18.0
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pnpm install --frozen-lockfile
@@ -27,7 +27,7 @@ jobs:
       - run: mkdir -p artifacts && pnpm pack --pack-destination artifacts
       - run: python -m pip install build
       - run: python -m build --outdir artifacts
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           files: artifacts/*
