@@ -202,6 +202,9 @@ export class OpenClawCardBridge {
       runtime: "openclaw",
       route: normalizeRoute(ctx, event),
     });
+    this.api.logger.debug?.(
+      `[openclaw-hermes-feishu-card] inbound captured channel=${ctx.channelId} key=${key} conversation=${ctx.conversationId ?? "missing"} message=${event.messageId ?? ctx.messageId ?? "missing"}`,
+    );
   }
 
   private onBeforeTool(event: BeforeToolEvent, ctx: ToolContext): void {
@@ -255,6 +258,13 @@ export class OpenClawCardBridge {
     ctx: PluginHookReplyPayloadSendingContext,
   ): Promise<PluginHookReplyPayloadSendingResult | void> {
     const channel = event.channel ?? ctx.channelId;
+    this.api.logger.debug?.(
+      `[openclaw-hermes-feishu-card] reply hook channel=${channel ?? "missing"} kind=${event.kind} session=${event.sessionKey ?? ctx.sessionKey ?? "missing"} run=${event.runId ?? ctx.runId ?? "missing"} conversation=${ctx.conversationId ?? "missing"} payloadKeys=${Object.keys(
+        event.payload,
+      )
+        .sort()
+        .join(",")}`,
+    );
     if (!this.captures(channel)) {
       return;
     }
@@ -301,6 +311,11 @@ export class OpenClawCardBridge {
     }
 
     const delivered = await this.flush(key);
+    if (delivered && event.kind === "final") {
+      this.api.logger.info(
+        `[openclaw-hermes-feishu-card] card delivered channel=${channel} conversation=${ctx.conversationId ?? "unknown"}`,
+      );
+    }
     if (event.kind === "final") {
       this.cleanup(key);
     }

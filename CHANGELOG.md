@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Force Gateway startup activation so hook-only CardKit delivery is present in
+  the live Feishu inbound/reply pipeline instead of loading only in inspection
+  and standalone CLI processes.
+- Add route-safe diagnostics for captured replies and successful card delivery.
+
 ## 2.0.0
 
 - Renamed the unified project and plugin to `openclaw-hermes-feishu-card`.

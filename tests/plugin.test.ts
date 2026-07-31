@@ -1,6 +1,7 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { describe, expect, it, vi } from "vitest";
 
+import manifest from "../openclaw.plugin.json" with { type: "json" };
 import plugin from "../src/index.js";
 
 function createApi(pluginConfig: Record<string, unknown> = {}): {
@@ -28,6 +29,10 @@ function createApi(pluginConfig: Record<string, unknown> = {}): {
 }
 
 describe("OpenClaw plugin entry point", () => {
+  it("activates during Gateway startup so message hooks are live", () => {
+    expect(manifest.activation).toEqual({ onStartup: true });
+  });
+
   it("registers the current hook set", () => {
     const { api, on, info } = createApi();
     expect(plugin.register).toBeTypeOf("function");

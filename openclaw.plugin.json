@@ -3,6 +3,9 @@
   "name": "OpenClaw Hermes Feishu Card",
   "description": "One CardKit reply with tool progress, runtime resources, token totals and cost metrics.",
   "version": "2.0.0",
+  "activation": {
+    "onStartup": true
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
