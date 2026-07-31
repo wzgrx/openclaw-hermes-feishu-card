@@ -1,12 +1,15 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-import { buildJsonPluginConfigSchema } from "openclaw/plugin-sdk/core";
+import {
+  buildJsonPluginConfigSchema,
+  type OpenClawPluginApi,
+  type OpenClawPluginDefinition,
+} from "openclaw/plugin-sdk/core";
 
 import manifest from "../openclaw.plugin.json" with { type: "json" };
 
 import { resolveConfig } from "./core/config.js";
 import { OpenClawCardBridge } from "./openclaw/bridge.js";
 
-const plugin = {
+const plugin: OpenClawPluginDefinition = {
   id: "openclaw-feishu-card-footer",
   name: "OpenClaw Feishu Card Footer",
   description:

@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { describe, expect, it, vi } from "vitest";
 
 import plugin from "../src/index.js";
@@ -30,7 +30,8 @@ function createApi(pluginConfig: Record<string, unknown> = {}): {
 describe("OpenClaw plugin entry point", () => {
   it("registers the current hook set", () => {
     const { api, on, info } = createApi();
-    plugin.register(api);
+    expect(plugin.register).toBeTypeOf("function");
+    plugin.register?.(api);
 
     const hookNames: string[] = [];
     for (const rawCall of on.mock.calls) {
@@ -54,7 +55,8 @@ describe("OpenClaw plugin entry point", () => {
 
   it("does not register hooks when disabled", () => {
     const { api, on, info } = createApi({ enabled: false });
-    plugin.register(api);
+    expect(plugin.register).toBeTypeOf("function");
+    plugin.register?.(api);
 
     expect(on).not.toHaveBeenCalled();
     expect(info).toHaveBeenCalledWith(expect.stringContaining("disabled"));

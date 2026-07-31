@@ -1,13 +1,9 @@
 import type {
-  PluginHookAfterToolCallEvent,
-  PluginHookMessageContext,
-  PluginHookMessageReceivedEvent,
   PluginHookReplyPayloadSendingContext,
   PluginHookReplyPayloadSendingEvent,
   PluginHookReplyPayloadSendingResult,
-  PluginHookToolContext,
-} from "openclaw/plugin-sdk/plugin-runtime";
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+  OpenClawPluginApi,
+} from "openclaw/plugin-sdk/core";
 
 import {
   ResourceSampler,
@@ -29,6 +25,38 @@ type BeforeToolEvent = {
   runId?: string;
 };
 
+interface MessageContext {
+  channelId: string;
+  accountId?: string;
+  conversationId?: string;
+  sessionKey?: string;
+  runId?: string;
+  messageId?: string;
+}
+
+interface MessageReceivedEvent {
+  sessionKey?: string;
+  runId?: string;
+  messageId?: string;
+  threadId?: string | number;
+}
+
+interface ToolContext {
+  channelId?: string;
+  sessionKey?: string;
+  runId?: string;
+  toolCallId?: string;
+}
+
+interface AfterToolEvent {
+  toolName: string;
+  result?: unknown;
+  error?: string;
+  durationMs?: number;
+  toolCallId?: string;
+  runId?: string;
+}
+
 function keyFrom(params: {
   sessionKey?: string | undefined;
   runId?: string | undefined;
@@ -47,8 +75,8 @@ function keyFrom(params: {
 }
 
 function normalizeRoute(
-  ctx: PluginHookMessageContext,
-  event?: PluginHookMessageReceivedEvent,
+  ctx: MessageContext,
+  event?: MessageReceivedEvent,
 ): SessionRoute {
   return {
     channelId: ctx.channelId,
@@ -150,8 +178,8 @@ export class OpenClawCardBridge {
   }
 
   private onMessageReceived(
-    event: PluginHookMessageReceivedEvent,
-    ctx: PluginHookMessageContext,
+    event: MessageReceivedEvent,
+    ctx: MessageContext,
   ): void {
     if (!this.captures(ctx.channelId)) {
       return;
@@ -170,10 +198,7 @@ export class OpenClawCardBridge {
     });
   }
 
-  private onBeforeTool(
-    event: BeforeToolEvent,
-    ctx: PluginHookToolContext,
-  ): void {
+  private onBeforeTool(event: BeforeToolEvent, ctx: ToolContext): void {
     const key = keyFrom({
       sessionKey: ctx.sessionKey,
       runId: event.runId ?? ctx.runId,
@@ -195,10 +220,7 @@ export class OpenClawCardBridge {
     this.scheduleFlush(key);
   }
 
-  private onAfterTool(
-    event: PluginHookAfterToolCallEvent,
-    ctx: PluginHookToolContext,
-  ): void {
+  private onAfterTool(event: AfterToolEvent, ctx: ToolContext): void {
     const key = keyFrom({
       sessionKey: ctx.sessionKey,
       runId: event.runId ?? ctx.runId,

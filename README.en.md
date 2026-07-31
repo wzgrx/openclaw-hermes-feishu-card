@@ -44,7 +44,9 @@ For a local WSL checkout, install both integrations with:
 bash scripts/install-wsl.sh --all --restart
 ```
 
-See [configuration](docs/configuration.md), [architecture](docs/architecture.md), and [migration](docs/migration.md).
+See [configuration](docs/configuration.md), [architecture](docs/architecture.md),
+[compatibility](docs/compatibility.md), [maintenance](docs/maintenance.md), and
+[migration](docs/migration.md).
 
 ## Principles
 

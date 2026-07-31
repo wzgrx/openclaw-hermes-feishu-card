@@ -8,7 +8,7 @@ description: >
   token/cost panels.
 author: wzgrx
 pip_dependencies:
-  - "lark-oapi>=1.7.1,<2"
+  - "lark-oapi>=1.6.8,<2"
   - "tzdata>=2025.3,<2027"
 requires_env:
   - name: FEISHU_APP_ID

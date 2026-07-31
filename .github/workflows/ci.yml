@@ -11,6 +11,10 @@ permissions:
 jobs:
   node:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22.22.3", "24.15.0", "25.9.0"]
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
@@ -18,13 +22,16 @@ jobs:
           version: 11.18.0
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+      - run: pnpm compat:openclaw
       - run: pnpm run doctor
       - run: pnpm pack --pack-destination artifacts
+        if: matrix.node == '24.15.0'
       - uses: actions/upload-artifact@v6
+        if: matrix.node == '24.15.0'
         with:
           name: npm-package
           path: artifacts/*.tgz
@@ -45,7 +52,13 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy hermes_feishu_card_footer
+      - run: python -c "import gateway; print('Hermes runtime import OK')"
       - run: pytest
+      - name: Test Feishu SDK lower bound
+        if: matrix.python == '3.12'
+        run: |
+          python -m pip install 'lark-oapi==1.6.8'
+          pytest tests_py/test_client.py tests_py/test_hermes_runtime.py
       - run: python -m build
       - uses: actions/upload-artifact@v6
         if: matrix.python == '3.12'

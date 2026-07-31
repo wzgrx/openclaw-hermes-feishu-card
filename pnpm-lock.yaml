@@ -21,6 +21,9 @@ importers:
       "@eslint/js":
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.8.0(jiti@2.7.0))
+      "@larksuite/openclaw-lark":
+        specifier: ^2026.7.16
+        version: 2026.7.16(debug@4.4.3)(openclaw@2026.7.1-2)
       "@types/node":
         specifier: ^26.1.2
         version: 26.1.2
@@ -299,6 +302,19 @@ packages:
       {
         integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==,
       }
+
+  "@larksuite/openclaw-lark@2026.7.16":
+    resolution:
+      {
+        integrity: sha512-D3LNGy+Nk9QZnMi0ir0AvMSyaVc0xaU+0U5psRgwGRlvmgXLjsa5ayrko4zD1Es2DNutLCrYBRIu3yOY5DI+zw==,
+      }
+    engines: { node: ">=22" }
+    hasBin: true
+    peerDependencies:
+      openclaw: ">=2026.5.4"
+    peerDependenciesMeta:
+      openclaw:
+        optional: true
 
   "@larksuiteoapi/node-sdk@1.72.0":
     resolution:
@@ -792,6 +808,12 @@ packages:
     resolution:
       {
         integrity: sha512-bnly4BKB3KDTFxrUIcgCLbaeVVS8lrAkri1pEzskpmxu9MdfGQTy8b8EgcD83ywD3RPMsIulY8xJH5Awa+t9fA==,
+      }
+
+  "@sinclair/typebox@0.34.49":
+    resolution:
+      {
+        integrity: sha512-brySQQs7Jtn0joV8Xh9ZV/hZb9Ozb0pmazDIASBkYKCjXrXU3mpcFahmK/z4YDhGkQvP9mWJbVyahdtU5wQA+A==,
       }
 
   "@stablelib/base64@1.0.1":
@@ -2316,6 +2338,14 @@ packages:
         integrity: sha512-BAg6QkE8W+TuQLrrw0Ugr7HegXduRuuj8/ti2kSOc+jz1dmx8/WNcjr6XGnq5YpDWxFwwaavqD0+jIUOKelTsw==,
       }
     engines: { node: ">= 4" }
+
+  image-size@2.0.2:
+    resolution:
+      {
+        integrity: sha512-IRqXKlaXwgSMAMtpNzZa1ZAe8m+Sa1770Dhk8VkSsP9LS+iHD62Zd8FQKs8fbPiagBE7BzoFX23cxFnwshpV6w==,
+      }
+    engines: { node: ">=16.x" }
+    hasBin: true
 
   immediate@3.0.6:
     resolution:
@@ -4196,6 +4226,21 @@ snapshots:
 
   "@jridgewell/sourcemap-codec@1.5.5": {}
 
+  "@larksuite/openclaw-lark@2026.7.16(debug@4.4.3)(openclaw@2026.7.1-2)":
+    dependencies:
+      "@larksuiteoapi/node-sdk": 1.72.0(debug@4.4.3)
+      "@sinclair/typebox": 0.34.49
+      image-size: 2.0.2
+      undici-types: 8.3.0
+      zod: 4.4.3
+    optionalDependencies:
+      openclaw: 2026.7.1-2
+    transitivePeerDependencies:
+      - bufferutil
+      - debug
+      - supports-color
+      - utf-8-validate
+
   "@larksuiteoapi/node-sdk@1.72.0(debug@4.4.3)":
     dependencies:
       axios: 1.18.1(debug@4.4.3)
@@ -4446,6 +4491,8 @@ snapshots:
   "@rolldown/pluginutils@1.0.1": {}
 
   "@silvia-odwyer/photon-node@0.3.4": {}
+
+  "@sinclair/typebox@0.34.49": {}
 
   "@stablelib/base64@1.0.1": {}
 
@@ -5331,6 +5378,8 @@ snapshots:
   ignore@7.0.5: {}
 
   ignore@7.0.6: {}
+
+  image-size@2.0.2: {}
 
   immediate@3.0.6: {}
 

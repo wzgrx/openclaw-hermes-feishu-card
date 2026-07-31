@@ -4,11 +4,11 @@
 
 | 运行时          | 版本      | 集成面                                                |
 | --------------- | --------- | ----------------------------------------------------- |
-| OpenClaw        | 2026.7.1+ | 已验证 2026.7.1-2；`reply_payload_sending`、工具 Hook |
-| openclaw-lark   | 2026.7.x  | 已验证 2026.7.16；通道 ID 为 `feishu`                 |
-| Hermes Agent    | 0.19.x    | 用户平台插件、`GatewayStreamConsumer`、生命周期 Hook  |
+| OpenClaw        | 2026.7.x  | 已验证 2026.7.1-2；`reply_payload_sending`、工具 Hook |
+| openclaw-lark   | 2026.7.x  | 已验证 2026.7.16 同时加载；通道 ID 为 `feishu`        |
+| Hermes Agent    | 0.19.x    | 已验证 PyPI 0.19.0 与源码标签 0.19.1                  |
 | 飞书 Node SDK   | 1.72.x    | CardKit v1、IM v1                                     |
-| 飞书 Python SDK | 1.7.x     | CardKit v1、IM v1                                     |
+| 飞书 Python SDK | 1.6.8–1.x | CardKit v1、IM v1                                     |
 
 ## 通道职责
 
@@ -24,6 +24,9 @@
 ## 升级策略
 
 - Dependabot 跟踪 npm、pip 与 GitHub Actions。
-- CI 覆盖 Node 24 和 Python 3.11–3.13。
-- 对 OpenClaw Hook 类型和 Hermes 平台注册进行加载测试。
+- CI 覆盖 Node 22.22.3、24.15.0、25.9.0 和 Python 3.11–3.13。
+- 对 OpenClaw Hook、Hermes 平台注册和 CardKit 生命周期进行真实运行时加载测试。
+- 每周对 npm 最新稳定版、OpenClaw beta 插件 API 和 Hermes `main` 执行兼容哨兵测试。
 - Hermes 0.20 或 OpenClaw 新主版本发布时先在兼容分支验证。
+
+完整升级步骤见 [维护与升级](maintenance.md)。

@@ -7,3 +7,5 @@
 - Added a shared, versioned and backward-compatible NDJSON usage ledger.
 - Added CardKit byte, element and markdown-table limit guards.
 - Added native WSL runtime discovery, CI, release packaging and bilingual documentation.
+- Added runtime contract tests for OpenClaw and Hermes plus a weekly upstream compatibility workflow.
+- Moved OpenClaw types to the supported `plugin-sdk/core` surface and added a beta API canary.

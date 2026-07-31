@@ -1,6 +1,6 @@
 # OpenClaw / Hermes 飞书 CardKit 插件
 
-[English](README.en.md) · [架构](docs/architecture.md) · [配置](docs/configuration.md) · [迁移](docs/migration.md)
+[English](README.en.md) · [架构](docs/architecture.md) · [配置](docs/configuration.md) · [兼容性](docs/compatibility.md) · [维护](docs/maintenance.md) · [迁移](docs/migration.md)
 
 一个仓库、两套原生集成：
 
@@ -21,17 +21,17 @@
 
 ## 兼容基线
 
-| 组件                       | 基线                              |
-| -------------------------- | --------------------------------- |
-| OpenClaw                   | `2026.7.1-2`（兼容 `>=2026.7.1`） |
-| `@larksuite/openclaw-lark` | `2026.7.16`                       |
-| Hermes Agent               | `>= 0.19.0, < 0.20`               |
-| Node.js                    | 22 / 24 / 25 的 OpenClaw 支持版本 |
-| pnpm                       | `11.18.0`                         |
-| TypeScript                 | `6.0.3`（当前工具链最新兼容版）   |
-| Python                     | 3.11–3.13                         |
-| Feishu Node SDK            | `@larksuiteoapi/node-sdk ^1.72.0` |
-| Feishu Python SDK          | `lark-oapi >=1.7.1,<2`            |
+| 组件                       | 基线                                    |
+| -------------------------- | --------------------------------------- |
+| OpenClaw                   | `2026.7.1-2`（兼容 `>=2026.7.1 <2027`） |
+| `@larksuite/openclaw-lark` | `2026.7.16`                             |
+| Hermes Agent               | `>= 0.19.0, < 0.20`                     |
+| Node.js                    | 22 / 24 / 25 的 OpenClaw 支持版本       |
+| pnpm                       | `11.18.0`                               |
+| TypeScript                 | `6.0.3`（当前工具链最新兼容版）         |
+| Python                     | 3.11–3.13                               |
+| Feishu Node SDK            | `@larksuiteoapi/node-sdk ^1.72.0`       |
+| Feishu Python SDK          | `lark-oapi >=1.6.8,<2`                  |
 
 ## 快速开始
 
@@ -138,6 +138,7 @@ pnpm typecheck
 pnpm lint
 pnpm test
 pnpm build
+pnpm compat:openclaw
 
 .venv/bin/ruff check .
 .venv/bin/mypy hermes_feishu_card_footer

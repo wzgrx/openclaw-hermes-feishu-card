@@ -2,13 +2,11 @@ import os from "node:os";
 import path from "node:path";
 
 import type {
-  PluginHookMessageContext,
-  PluginHookMessageReceivedEvent,
   PluginHookReplyPayloadSendingContext,
   PluginHookReplyPayloadSendingEvent,
   PluginHookReplyPayloadSendingResult,
-} from "openclaw/plugin-sdk/plugin-runtime";
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+  OpenClawPluginApi,
+} from "openclaw/plugin-sdk/core";
 import { describe, expect, it, vi } from "vitest";
 
 import { resolveConfig } from "../src/core/config.js";
@@ -18,14 +16,28 @@ import { OpenClawCardBridge } from "../src/openclaw/bridge.js";
 interface BridgeHarness {
   sessions: SessionRegistry;
   flush(key: string): Promise<boolean>;
-  onMessageReceived(
-    event: PluginHookMessageReceivedEvent,
-    ctx: PluginHookMessageContext,
-  ): void;
+  onMessageReceived(event: MessageReceivedEvent, ctx: MessageContext): void;
   onReplyPayload(
     event: PluginHookReplyPayloadSendingEvent,
     ctx: PluginHookReplyPayloadSendingContext,
   ): Promise<PluginHookReplyPayloadSendingResult | void>;
+}
+
+interface MessageReceivedEvent {
+  from?: string;
+  content?: string;
+  messageId?: string;
+  sessionKey?: string;
+  runId?: string;
+}
+
+interface MessageContext {
+  channelId?: string;
+  accountId?: string;
+  conversationId?: string;
+  sessionKey?: string;
+  runId?: string;
+  isGroup?: boolean;
 }
 
 function createHarness(): {
@@ -61,7 +73,7 @@ const context = {
   sessionKey: "session",
   runId: "run-1",
   isGroup: false,
-} as PluginHookMessageContext;
+} satisfies MessageContext;
 
 describe("OpenClaw card bridge delivery policy", () => {
   it("keys state by turn run id and removes it after final delivery", async () => {
