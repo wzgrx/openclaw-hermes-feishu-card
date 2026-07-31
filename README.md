@@ -63,7 +63,7 @@ openclaw plugins enable openclaw-hermes-feishu-card
 openclaw plugins doctor
 ```
 
-将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。建议把飞书原通道的 `streaming` 设为 `false`，由本插件统一渲染卡片。
+将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。使用 `@larksuite/openclaw-lark` 2026.7.x 时，将飞书通道设置为 `streaming: true`、`replyMode: "streaming"`；该版本的旧版 direct dispatcher 由通道原生 CardKit controller 负责最终卡片投递。
 
 ### 3. 安装到 Hermes
 

@@ -91,6 +91,15 @@ const fs = require("node:fs");
 const path = require("node:path");
 const [configPath, oldId, newId, root] = process.argv.slice(2);
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+config.channels ??= {};
+if (config.channels.feishu && typeof config.channels.feishu === "object") {
+  // @larksuite/openclaw-lark 2026.7.x calls the legacy direct reply dispatcher,
+  // which does not install cross-plugin reply_payload_sending modifiers. Keep
+  // its native CardKit controller enabled so Feishu replies remain cards.
+  config.channels.feishu.streaming = true;
+  config.channels.feishu.replyMode = "streaming";
+  config.channels.feishu.blockStreaming = false;
+}
 config.plugins ??= {};
 config.plugins.entries ??= {};
 const oldEntry = config.plugins.entries[oldId];

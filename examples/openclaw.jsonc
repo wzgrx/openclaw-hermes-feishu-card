@@ -2,7 +2,9 @@
   "channels": {
     "feishu": {
       "enabled": true,
-      "streaming": false,
+      "streaming": true,
+      "replyMode": "streaming",
+      "blockStreaming": false,
       // appId/appSecret 可继续使用现有配置或 FEISHU_APP_ID/FEISHU_APP_SECRET
     },
   },

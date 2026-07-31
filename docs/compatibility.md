@@ -2,13 +2,13 @@
 
 ## 支持矩阵
 
-| 运行时          | 版本      | 集成面                                                |
-| --------------- | --------- | ----------------------------------------------------- |
-| OpenClaw        | 2026.7.x  | 已验证 2026.7.1-2；`reply_payload_sending`、工具 Hook |
-| openclaw-lark   | 2026.7.x  | 已验证 2026.7.16 同时加载；通道 ID 为 `feishu`        |
-| Hermes Agent    | 0.19.x    | 已验证 PyPI 0.19.0 与源码标签 0.19.1                  |
-| 飞书 Node SDK   | 1.72.x    | CardKit v1、IM v1                                     |
-| 飞书 Python SDK | 1.6.8–1.x | CardKit v1、IM v1                                     |
+| 运行时          | 版本      | 集成面                                                       |
+| --------------- | --------- | ------------------------------------------------------------ |
+| OpenClaw        | 2026.7.x  | 标准 routed delivery 使用 `reply_payload_sending`、工具 Hook |
+| openclaw-lark   | 2026.7.x  | 2026.7.16 direct dispatcher；使用通道原生 CardKit controller |
+| Hermes Agent    | 0.19.x    | 已验证 PyPI 0.19.0 与源码标签 0.19.1                         |
+| 飞书 Node SDK   | 1.72.x    | CardKit v1、IM v1                                            |
+| 飞书 Python SDK | 1.6.8–1.x | CardKit v1、IM v1                                            |
 
 ## 通道职责
 
@@ -22,6 +22,11 @@
 | 审批、命令、配对       | 否     | 是         |
 
 上游通道仍负责媒体传输；本插件会在 Hermes 卡片内附加安全截断后的附件摘要。
+
+`@larksuite/openclaw-lark` 2026.7.16 的 direct dispatcher 不经过跨插件
+`reply_payload_sending` 修改器。安装器会为该组合写入
+`streaming=true`、`replyMode="streaming"`，由其原生 CardKit controller 保证
+OpenClaw 回复为卡片；标准 routed delivery 与 Hermes 仍由本项目的桥接层渲染。
 
 ## 旧项目功能移植
 

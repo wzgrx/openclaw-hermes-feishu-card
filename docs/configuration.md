@@ -9,7 +9,9 @@
   "channels": {
     "feishu": {
       "enabled": true,
-      "streaming": false,
+      "streaming": true,
+      "replyMode": "streaming",
+      "blockStreaming": false,
     },
   },
   "plugins": {
@@ -32,6 +34,12 @@
   },
 }
 ```
+
+`@larksuite/openclaw-lark` 2026.7.x 的入站路径直接调用旧版 reply
+dispatcher，不会安装跨插件的 `reply_payload_sending` 修改器。因此该组合必须保留
+上游通道的 CardKit controller：`streaming=true` 且
+`replyMode="streaming"`。本插件对支持标准 routed delivery 的通道继续使用原生
+Hook 接管；遇到富媒体或上游原生卡片时自动 fail-open，避免重复消息。
 
 插件从以下位置依次解析飞书凭据：
 

@@ -6,6 +6,8 @@
   the live Feishu inbound/reply pipeline instead of loading only in inspection
   and standalone CLI processes.
 - Add route-safe diagnostics for captured replies and successful card delivery.
+- Keep native streaming CardKit enabled for `@larksuite/openclaw-lark` 2026.7.x,
+  whose direct dispatcher bypasses cross-plugin reply payload modifiers.
 
 ## 2.0.0
 
