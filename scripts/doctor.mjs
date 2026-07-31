@@ -12,11 +12,11 @@ const manifest = JSON.parse(
 );
 const hermesManifest = await readFile(resolve(root, "plugin.yaml"), "utf8");
 const packagedHermesManifest = await readFile(
-  resolve(root, "hermes_feishu_card_footer", "plugin.yaml"),
+  resolve(root, "openclaw_hermes_feishu_card", "plugin.yaml"),
   "utf8",
 );
 const pythonPackage = await readFile(
-  resolve(root, "hermes_feishu_card_footer", "__init__.py"),
+  resolve(root, "openclaw_hermes_feishu_card", "__init__.py"),
   "utf8",
 );
 const checks = [];
@@ -57,7 +57,7 @@ for (const file of [
   "openclaw.plugin.json",
   "plugin.yaml",
   "__init__.py",
-  "hermes_feishu_card_footer/__init__.py",
+  "openclaw_hermes_feishu_card/__init__.py",
 ]) {
   try {
     await access(resolve(root, file), constants.R_OK);

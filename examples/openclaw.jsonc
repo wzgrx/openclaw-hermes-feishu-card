@@ -8,13 +8,17 @@
   },
   "plugins": {
     "entries": {
-      "openclaw-feishu-card-footer": {
+      "openclaw-hermes-feishu-card": {
         "enabled": true,
         "config": {
           "enabled": true,
           "captureChannels": ["feishu", "openclaw-lark"],
+          "title": "OpenClaw",
+          "accountTitles": {},
           "timezone": "Asia/Shanghai",
-          "storageDir": "~/.local/share/feishu-card-footer",
+          "storageDir": "~/.local/share/openclaw-hermes-feishu-card",
+          "legacyTaskDir": "/tmp/openclaw-tasks",
+          "balanceCachePath": "~/.openclaw/data/balance-cache.json",
           "updateIntervalMs": 800,
           "panels": {
             "reasoning": true,
@@ -33,6 +37,10 @@
             "context": true,
             "cost": true,
             "totals": true,
+            "todayTokens": true,
+            "monthTokens": true,
+            "backgroundTasks": true,
+            "balance": true,
           },
           "pricing": [
             {

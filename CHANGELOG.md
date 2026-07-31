@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.0
+
+- Renamed the unified project and plugin to `openclaw-hermes-feishu-card`.
+- Migrated the legacy multi-account title, attachment summary, GPU, background-task
+  and provider-balance presentation features.
+- Added compatibility for the former Python package, CLI, configuration fields,
+  environment variable and usage-ledger location.
+- Replaced source patches, sidecars and progress HTTP services with native OpenClaw
+  hooks and a Hermes platform adapter.
+- Added bounded readers for legacy task and balance cache files plus a credential-safe
+  balance refresh helper.
+
 ## 1.0.0
 
 - Rebuilt the repository as a dual OpenClaw/Hermes CardKit plugin.

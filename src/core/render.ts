@@ -3,6 +3,7 @@ import { Buffer } from "node:buffer";
 import type {
   CardFooterConfig,
   CardJson,
+  LegacyRuntimeSnapshot,
   ResourceSnapshot,
   SessionSnapshot,
   ToolStep,
@@ -295,9 +296,10 @@ function buildFooter(params: {
   session: SessionSnapshot;
   totals: UsageTotals;
   config: CardFooterConfig;
+  legacy?: LegacyRuntimeSnapshot;
   now: number;
 }): CardElement | undefined {
-  const { session, totals, config, now } = params;
+  const { session, totals, config, legacy, now } = params;
   const usage = session.usage;
   const items: string[] = [];
   if (config.footer.status) {
@@ -350,14 +352,63 @@ function buildFooter(params: {
     items.push(`本次 ${money(usage.turnCost, usage.currency)}`);
   }
   if (config.footer.totals) {
-    items.push(
-      `Token 今/月/总 ${compactNumber(totals.todayTokens)}/${compactNumber(totals.monthTokens)}/${compactNumber(totals.allTimeTokens)}`,
-    );
+    const tokenTotals = [
+      ...(config.footer.todayTokens
+        ? [`今 ${compactNumber(totals.todayTokens)}`]
+        : []),
+      ...(config.footer.monthTokens
+        ? [`月 ${compactNumber(totals.monthTokens)}`]
+        : []),
+      `总 ${compactNumber(totals.allTimeTokens)}`,
+    ];
+    items.push(`Token ${tokenTotals.join("/")}`);
     if (totals.allTimeCost > 0 && totals.currency) {
+      const costTotals = [
+        ...(config.footer.todayTokens
+          ? [`今 ${money(totals.todayCost, totals.currency)}`]
+          : []),
+        ...(config.footer.monthTokens
+          ? [`月 ${money(totals.monthCost, totals.currency)}`]
+          : []),
+        `总 ${money(totals.allTimeCost, totals.currency)}`,
+      ];
+      items.push(`费用 ${costTotals.join("/")}`);
+    }
+  }
+  if (config.footer.backgroundTasks && legacy) {
+    const running = legacy.tasks.filter((task) => task.status === "running");
+    const stalled = legacy.tasks.filter((task) => task.status === "stalled");
+    if (running.length > 0) {
       items.push(
-        `费用 今/月/总 ${money(totals.todayCost, totals.currency)}/${money(totals.monthCost, totals.currency)}/${money(totals.allTimeCost, totals.currency)}`,
+        `后台任务 ${running.length} 个进行中：${running
+          .slice(0, 3)
+          .map((task) =>
+            task.progress === undefined
+              ? task.name
+              : `${task.name} ${Math.round(task.progress)}%`,
+          )
+          .join("、")}`,
       );
     }
+    if (stalled.length > 0) {
+      items.push(
+        `⚠️ ${stalled.length} 个任务停滞：${stalled
+          .slice(0, 3)
+          .map((task) => task.name)
+          .join("、")}`,
+      );
+    }
+  }
+  if (config.footer.balance && legacy?.balances.length) {
+    items.push(
+      `余额 ${legacy.balances
+        .slice(0, 3)
+        .map(
+          (balance) =>
+            `${balance.available ? "" : "⚠️"}${balance.platform} ¥${balance.total.toFixed(2)}`,
+        )
+        .join(" · ")}`,
+    );
   }
   if (items.length === 0) {
     return undefined;
@@ -388,6 +439,7 @@ export function renderCard(params: {
   totals: UsageTotals;
   config: CardFooterConfig;
   resource?: ResourceSnapshot;
+  legacy?: LegacyRuntimeSnapshot;
   now?: number;
 }): CardJson {
   const now = params.now ?? Date.now();
@@ -436,7 +488,13 @@ export function renderCard(params: {
   );
 
   if (config.panels.footer) {
-    const footer = buildFooter({ session, totals: params.totals, config, now });
+    const footer = buildFooter({
+      session,
+      totals: params.totals,
+      config,
+      now,
+      ...(params.legacy ? { legacy: params.legacy } : {}),
+    });
     if (footer) {
       elements.push(footer);
     }
@@ -446,6 +504,12 @@ export function renderCard(params: {
     .replace(/[*_`#>[\]()~]/g, "")
     .trim()
     .slice(0, 120);
+  const title =
+    (session.route?.accountId
+      ? config.accountTitles[session.route.accountId]
+      : undefined) ??
+    config.title ??
+    (session.runtime === "openclaw" ? "OpenClaw" : "Hermes");
   return fitCardByteBudget({
     schema: "2.0",
     config: {
@@ -465,10 +529,10 @@ export function renderCard(params: {
       template: headerTemplate(session.status),
       title: {
         tag: "plain_text",
-        content: session.runtime === "openclaw" ? "OpenClaw" : "Hermes",
+        content: title,
         i18n_content: {
-          zh_cn: session.runtime === "openclaw" ? "龙虾 OpenClaw" : "Hermes",
-          en_us: session.runtime === "openclaw" ? "OpenClaw" : "Hermes",
+          zh_cn: title,
+          en_us: title,
         },
       },
       subtitle: {

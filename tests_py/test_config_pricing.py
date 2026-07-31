@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from hermes_feishu_card_footer.config import HermesCardConfig
-from hermes_feishu_card_footer.models import UsageSnapshot
-from hermes_feishu_card_footer.pricing import calculate_cost, resolve_pricing_rule
+from openclaw_hermes_feishu_card.config import HermesCardConfig
+from openclaw_hermes_feishu_card.models import UsageSnapshot
+from openclaw_hermes_feishu_card.pricing import calculate_cost, resolve_pricing_rule
 
 
 def test_config_supports_camel_case_and_snake_case(tmp_path) -> None:
@@ -11,8 +11,13 @@ def test_config_supports_camel_case_and_snake_case(tmp_path) -> None:
             "card_footer": {
                 "storageDir": str(tmp_path),
                 "updateIntervalMs": 100,
+                "title": "Hermes Bot",
                 "panels": {"reasoning": False},
-                "footer": {"first_token": False},
+                "footer": {
+                    "first_token": False,
+                    "backgroundTasks": False,
+                    "balance": False,
+                },
                 "pricing": [
                     {
                         "pattern": "openrouter/*",
@@ -26,8 +31,11 @@ def test_config_supports_camel_case_and_snake_case(tmp_path) -> None:
     )
     assert config.storage_dir == tmp_path.resolve()
     assert config.update_interval_ms == 250
+    assert config.title == "Hermes Bot"
     assert config.panels.reasoning is False
     assert config.footer.first_token is False
+    assert config.footer.background_tasks is False
+    assert config.footer.balance is False
     assert config.pricing[0].currency == "USD"
 
 

@@ -29,6 +29,27 @@ def _apply_yaml_config(
     card_footer = feishu_cfg.get("card_footer") or feishu_cfg.get("cardFooter")
     if isinstance(card_footer, dict):
         result["card_footer"] = dict(card_footer)
+    else:
+        legacy_card = yaml_cfg.get("card")
+        if isinstance(legacy_card, dict):
+            migrated: dict[str, Any] = {}
+            title = legacy_card.get("title")
+            if isinstance(title, str) and title.strip():
+                migrated["title"] = title.strip()
+            max_wait_ms = legacy_card.get("max_wait_ms")
+            if isinstance(max_wait_ms, int) and not isinstance(max_wait_ms, bool):
+                migrated["update_interval_ms"] = max_wait_ms
+            footer_fields = legacy_card.get("footer_fields")
+            if isinstance(footer_fields, list):
+                names = {str(item) for item in footer_fields}
+                migrated["footer"] = {
+                    "elapsed": "duration" in names,
+                    "model": "model" in names,
+                    "tokens": bool({"input_tokens", "output_tokens"} & names),
+                    "context": "context" in names,
+                }
+            if migrated:
+                result["card_footer"] = migrated
     return result or None
 
 

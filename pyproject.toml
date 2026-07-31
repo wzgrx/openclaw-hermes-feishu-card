@@ -3,8 +3,8 @@ requires = ["hatchling>=1.31"]
 build-backend = "hatchling.build"
 
 [project]
-name = "hermes-feishu-card-footer"
-version = "1.0.0"
+name = "openclaw-hermes-feishu-card"
+version = "2.0.0"
 description = "Hermes Feishu CardKit adapter with streaming progress and runtime footer metrics"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -29,16 +29,17 @@ dev = [
 ]
 
 [project.scripts]
-hermes-feishu-card-footer = "hermes_feishu_card_footer.cli:main"
+openclaw-hermes-feishu-card = "openclaw_hermes_feishu_card.cli:main"
+hermes-feishu-card-footer = "openclaw_hermes_feishu_card.cli:main"
 
 [project.entry-points."hermes_agent.plugins"]
-hermes-feishu-card-footer = "hermes_feishu_card_footer"
+openclaw-hermes-feishu-card = "openclaw_hermes_feishu_card"
 
 [tool.hatch.build.targets.wheel]
-packages = ["hermes_feishu_card_footer"]
+packages = ["openclaw_hermes_feishu_card", "hermes_feishu_card_footer"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"hermes_feishu_card_footer/plugin.yaml" = "hermes_feishu_card_footer/plugin.yaml"
+"openclaw_hermes_feishu_card/plugin.yaml" = "openclaw_hermes_feishu_card/plugin.yaml"
 
 [tool.pytest.ini_options]
 addopts = "-q"

@@ -41,6 +41,10 @@ const footerSchema = z
     context: z.boolean().default(true),
     cost: z.boolean().default(true),
     totals: z.boolean().default(true),
+    todayTokens: z.boolean().default(true),
+    monthTokens: z.boolean().default(true),
+    backgroundTasks: z.boolean().default(true),
+    balance: z.boolean().default(true),
   })
   .default({
     status: true,
@@ -52,11 +56,17 @@ const footerSchema = z
     context: true,
     cost: true,
     totals: true,
+    todayTokens: true,
+    monthTokens: true,
+    backgroundTasks: true,
+    balance: true,
   });
 
 export const cardFooterConfigSchema = z.object({
   enabled: z.boolean().default(true),
   captureChannels: z.array(z.string().min(1)).default(["feishu"]),
+  title: z.string().min(1).default("OpenClaw"),
+  accountTitles: z.record(z.string(), z.string().min(1)).default({}),
   timezone: z
     .string()
     .min(1)
@@ -73,6 +83,8 @@ export const cardFooterConfigSchema = z.object({
     )
     .default("Asia/Shanghai"),
   storageDir: z.string().min(1).optional(),
+  legacyTaskDir: z.string().min(1).optional(),
+  balanceCachePath: z.string().min(1).optional(),
   updateIntervalMs: z.number().int().min(250).max(10_000).default(800),
   panels: panelsSchema,
   footer: footerSchema,
@@ -95,8 +107,19 @@ export function resolveConfig(raw: unknown): CardFooterConfig {
     ...parsed,
     storageDir: expandHome(
       parsed.storageDir ??
+        process.env.OPENCLAW_HERMES_FEISHU_CARD_HOME ??
         process.env.FEISHU_CARD_FOOTER_HOME ??
-        path.join(os.homedir(), ".local", "share", "feishu-card-footer"),
+        path.join(
+          os.homedir(),
+          ".local",
+          "share",
+          "openclaw-hermes-feishu-card",
+        ),
+    ),
+    legacyTaskDir: expandHome(parsed.legacyTaskDir ?? "/tmp/openclaw-tasks"),
+    balanceCachePath: expandHome(
+      parsed.balanceCachePath ??
+        path.join(os.homedir(), ".openclaw", "data", "balance-cache.json"),
     ),
   };
 }

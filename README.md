@@ -16,6 +16,7 @@
 - 投递失败时保留上游原生文本链路。
 - 工具进度与回答共用卡片；媒体、审批、文件、语音继续走原生通道。
 - OpenClaw 与 Hermes 可写入同一份追加式 `usage.ndjson`。
+- 支持多账户卡片标题、附件摘要、GPU、旧版后台任务和供应商余额缓存。
 - App Secret 只从现有运行时配置或环境变量读取，日志中不输出凭据。
 - 中文/英文卡片标题与摘要，默认时区为 `Asia/Shanghai`。
 
@@ -58,7 +59,7 @@ pytest
 ```bash
 pnpm build
 openclaw plugins install --link .
-openclaw plugins enable openclaw-feishu-card-footer
+openclaw plugins enable openclaw-hermes-feishu-card
 openclaw plugins doctor
 ```
 
@@ -69,7 +70,7 @@ openclaw plugins doctor
 仓库发布后：
 
 ```bash
-hermes plugins install wzgrx/openclaw-feishu-card-footer --enable
+hermes plugins install wzgrx/openclaw-hermes-feishu-card --enable
 HERMES_BIN="$(readlink -f "$(command -v hermes)")"
 HERMES_PYTHON="$(dirname "$HERMES_BIN")/python"
 "$HERMES_PYTHON" -m pip install -e ~/.hermes/plugins/feishu-platform
@@ -86,7 +87,7 @@ bash scripts/install-wsl.sh --hermes
 
 ```bash
 hermes gateway restart
-"$HERMES_PYTHON" -m hermes_feishu_card_footer.cli doctor
+"$HERMES_PYTHON" -m openclaw_hermes_feishu_card.cli doctor
 ```
 
 ### 4. 同时安装两端
@@ -111,7 +112,7 @@ Python，避开 Windows PATH 互操作中的同名命令。
 OpenClaw 插件配置位于：
 
 ```text
-plugins.entries.openclaw-feishu-card-footer.config
+plugins.entries.openclaw-hermes-feishu-card.config
 ```
 
 Hermes 插件配置位于：
@@ -123,6 +124,9 @@ platforms.feishu.card_footer
 两个运行时使用相同概念：
 
 - `storageDir` / `storage_dir`
+- `title`、`accountTitles` / `account_titles`
+- `legacyTaskDir` / `legacy_task_dir`
+- `balanceCachePath` / `balance_cache_path`
 - `timezone`
 - `updateIntervalMs` / `update_interval_ms`
 - `panels`
@@ -141,7 +145,7 @@ pnpm build
 pnpm compat:openclaw
 
 .venv/bin/ruff check .
-.venv/bin/mypy hermes_feishu_card_footer
+.venv/bin/mypy openclaw_hermes_feishu_card
 .venv/bin/pytest
 ```
 
@@ -150,7 +154,8 @@ pnpm compat:openclaw
 ```text
 src/core/                       共享 TypeScript 状态、定价、账本与渲染
 src/openclaw/                   OpenClaw Hook 与 Feishu Node SDK 桥接
-hermes_feishu_card_footer/      Hermes 平台适配器与 CardKit Python SDK 桥接
+openclaw_hermes_feishu_card/    Hermes 平台适配器与 CardKit Python SDK 桥接
+hermes_feishu_card_footer/      旧 Python 导入名和 CLI 的兼容转发层
 tests/                          TypeScript 单元测试
 tests_py/                       Python 单元测试
 examples/                       两端配置示例
@@ -162,6 +167,8 @@ docs/                           架构、迁移、兼容与测试说明
 
 重构吸收了以下项目的成熟设计，但重新实现了状态层和双运行时适配：
 
+- [wzgrx/hermes-feishu-streaming-card](https://github.com/wzgrx/hermes-feishu-streaming-card)
+- [wzgrx/openclaw-hermes-card](https://github.com/wzgrx/openclaw-hermes-card)
 - [larksuite/openclaw-lark](https://github.com/larksuite/openclaw-lark)
 - [Cheerwhy/hermes-lark-streaming](https://github.com/Cheerwhy/hermes-lark-streaming)
 - [baileyh8/hermes-feishu-streaming-card](https://github.com/baileyh8/hermes-feishu-streaming-card)

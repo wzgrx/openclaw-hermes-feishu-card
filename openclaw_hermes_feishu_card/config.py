@@ -67,20 +67,30 @@ class Footer:
     context: bool = True
     cost: bool = True
     totals: bool = True
+    today_tokens: bool = True
+    month_tokens: bool = True
+    background_tasks: bool = True
+    balance: bool = True
 
 
 @dataclass(frozen=True, slots=True)
 class HermesCardConfig:
     enabled: bool = True
+    title: str = "Hermes"
     timezone: str = "Asia/Shanghai"
     storage_dir: Path = field(
         default_factory=lambda: Path(
             os.getenv(
-                "FEISHU_CARD_FOOTER_HOME",
-                "~/.local/share/feishu-card-footer",
+                "OPENCLAW_HERMES_FEISHU_CARD_HOME",
+                os.getenv(
+                    "FEISHU_CARD_FOOTER_HOME",
+                    "~/.local/share/openclaw-hermes-feishu-card",
+                ),
             )
         ).expanduser()
     )
+    legacy_task_dir: Path = field(default_factory=lambda: Path("/tmp/openclaw-tasks"))
+    balance_cache_path: Path = field(default_factory=lambda: Path("~/.openclaw/data/balance-cache.json").expanduser())
     update_interval_ms: int = 800
     panels: Panels = field(default_factory=Panels)
     footer: Footer = field(default_factory=Footer)
@@ -123,13 +133,27 @@ class HermesCardConfig:
         storage = str(
             raw.get("storageDir")
             or raw.get("storage_dir")
+            or os.getenv("OPENCLAW_HERMES_FEISHU_CARD_HOME")
             or os.getenv("FEISHU_CARD_FOOTER_HOME")
-            or "~/.local/share/feishu-card-footer"
+            or "~/.local/share/openclaw-hermes-feishu-card"
         )
         return cls(
             enabled=_bool(raw.get("enabled"), True),
+            title=str(raw.get("title") or "Hermes").strip() or "Hermes",
             timezone=str(raw.get("timezone") or "Asia/Shanghai"),
             storage_dir=Path(storage).expanduser().resolve(),
+            legacy_task_dir=Path(str(raw.get("legacyTaskDir") or raw.get("legacy_task_dir") or "/tmp/openclaw-tasks"))
+            .expanduser()
+            .resolve(),
+            balance_cache_path=Path(
+                str(
+                    raw.get("balanceCachePath")
+                    or raw.get("balance_cache_path")
+                    or "~/.openclaw/data/balance-cache.json"
+                )
+            )
+            .expanduser()
+            .resolve(),
             update_interval_ms=_int(
                 raw.get("updateIntervalMs", raw.get("update_interval_ms")),
                 800,
@@ -153,6 +177,19 @@ class HermesCardConfig:
                 context=_bool(footer_raw.get("context"), True),
                 cost=_bool(footer_raw.get("cost"), True),
                 totals=_bool(footer_raw.get("totals"), True),
+                today_tokens=_bool(
+                    footer_raw.get("todayTokens", footer_raw.get("today_tokens")),
+                    True,
+                ),
+                month_tokens=_bool(
+                    footer_raw.get("monthTokens", footer_raw.get("month_tokens")),
+                    True,
+                ),
+                background_tasks=_bool(
+                    footer_raw.get("backgroundTasks", footer_raw.get("background_tasks")),
+                    True,
+                ),
+                balance=_bool(footer_raw.get("balance"), True),
             ),
             pricing=tuple(pricing),
         )

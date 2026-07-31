@@ -20,6 +20,9 @@ describe("configuration", () => {
       footer: true,
     });
     expect(config.footer.tokens).toBe(true);
+    expect(config.footer.backgroundTasks).toBe(true);
+    expect(config.footer.balance).toBe(true);
+    expect(config.title).toBe("OpenClaw");
     expect(config.captureChannels).toContain("feishu");
   });
 

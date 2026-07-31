@@ -5,7 +5,7 @@ import re
 from typing import Any
 
 from .config import HermesCardConfig
-from .models import CardSession, ResourceSnapshot, ToolStep, UsageTotals
+from .models import CardSession, LegacyRuntimeSnapshot, ResourceSnapshot, ToolStep, UsageTotals
 
 MAX_ANSWER_CHARS = 18_000
 MAX_TOOL_STEPS = 20
@@ -207,6 +207,12 @@ def _resource_panel(resource: ResourceSnapshot) -> dict[str, Any]:
         ),
         f"Uptime {_duration(resource.uptime_seconds * 1000)}",
     ]
+    if resource.gpu_name:
+        utilization = "-" if resource.gpu_utilization_percent is None else f"{resource.gpu_utilization_percent:.0f}"
+        memory_used = "-" if resource.gpu_memory_used_mib is None else f"{resource.gpu_memory_used_mib:.0f}"
+        memory_total = "-" if resource.gpu_memory_total_mib is None else f"{resource.gpu_memory_total_mib:.0f}"
+        temperature = "-" if resource.gpu_temperature_c is None else f"{resource.gpu_temperature_c:.0f}"
+        lines.append(f"GPU {resource.gpu_name} · {utilization}% · {memory_used}/{memory_total} MiB · {temperature}°C")
     return _panel(
         "系统资源",
         "System resources",
@@ -234,6 +240,7 @@ def _footer(
     session: CardSession,
     totals: UsageTotals,
     config: HermesCardConfig,
+    legacy: LegacyRuntimeSnapshot | None,
     now: int,
 ) -> dict[str, Any] | None:
     items: list[str] = []
@@ -258,17 +265,39 @@ def _footer(
     if footer.cost and usage.turn_cost is not None:
         items.append(f"本次 {_money(usage.turn_cost, usage.currency)}")
     if footer.totals:
-        items.append(
-            "Token 今/月/总 "
-            f"{_compact(totals.today_tokens)}/{_compact(totals.month_tokens)}/{_compact(totals.all_time_tokens)}"
-        )
+        token_totals = []
+        if footer.today_tokens:
+            token_totals.append(f"今 {_compact(totals.today_tokens)}")
+        if footer.month_tokens:
+            token_totals.append(f"月 {_compact(totals.month_tokens)}")
+        token_totals.append(f"总 {_compact(totals.all_time_tokens)}")
+        items.append("Token " + "/".join(token_totals))
         if totals.all_time_cost and totals.currency:
-            items.append(
-                "费用 今/月/总 "
-                f"{_money(totals.today_cost, totals.currency)}/"
-                f"{_money(totals.month_cost, totals.currency)}/"
-                f"{_money(totals.all_time_cost, totals.currency)}"
+            cost_totals = []
+            if footer.today_tokens:
+                cost_totals.append(f"今 {_money(totals.today_cost, totals.currency)}")
+            if footer.month_tokens:
+                cost_totals.append(f"月 {_money(totals.month_cost, totals.currency)}")
+            cost_totals.append(f"总 {_money(totals.all_time_cost, totals.currency)}")
+            items.append("费用 " + "/".join(cost_totals))
+    if footer.background_tasks and legacy is not None:
+        running = [task for task in legacy.tasks if task.status == "running"]
+        stalled = [task for task in legacy.tasks if task.status == "stalled"]
+        if running:
+            names = "、".join(
+                task.name if task.progress is None else f"{task.name} {round(task.progress)}%" for task in running[:3]
             )
+            items.append(f"后台任务 {len(running)} 个进行中: {names}")
+        if stalled:
+            items.append(f"⚠️ {len(stalled)} 个任务停滞: " + "、".join(task.name for task in stalled[:3]))
+    if footer.balance and legacy is not None and legacy.balances:
+        items.append(
+            "余额 "
+            + " · ".join(
+                f"{'' if balance.available else '⚠️'}{balance.platform} ¥{balance.total:.2f}"
+                for balance in legacy.balances[:3]
+            )
+        )
     if not items:
         return None
     return _panel(
@@ -286,6 +315,7 @@ def render_card(
     config: HermesCardConfig,
     *,
     resource: ResourceSnapshot | None = None,
+    legacy: LegacyRuntimeSnapshot | None = None,
     now: int | None = None,
 ) -> dict[str, Any]:
     stamp = now or session.updated_at
@@ -309,6 +339,8 @@ def render_card(
         )
     if session.notices and not session.answer:
         elements.append(_markdown(session.notices[-1], "notation"))
+    if session.attachments:
+        elements.append(_markdown("附件: " + "、".join(session.attachments[:8]), "notation"))
     answer = session.answer or (
         "正在处理…"
         if session.status == "running"
@@ -320,7 +352,7 @@ def render_card(
         answer = answer[: MAX_ANSWER_CHARS - 20] + "\n\n…内容已截断"
     elements.append(_markdown(answer))
     if config.panels.footer:
-        footer = _footer(session, totals, config, stamp)
+        footer = _footer(session, totals, config, legacy, stamp)
         if footer is not None:
             elements.append(footer)
     summary = re.sub(r"[*_`#>\[\]()~]", "", answer).strip()[:120] or "Hermes 正在处理"
@@ -345,8 +377,8 @@ def render_card(
                 else "red",
                 "title": {
                     "tag": "plain_text",
-                    "content": "Hermes",
-                    "i18n_content": {"zh_cn": "Hermes", "en_us": "Hermes"},
+                    "content": config.title,
+                    "i18n_content": {"zh_cn": config.title, "en_us": config.title},
                 },
                 "subtitle": {"tag": "plain_text", "content": _status(session.status)},
             },

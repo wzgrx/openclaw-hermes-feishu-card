@@ -58,6 +58,24 @@ export interface ResourceSnapshot {
   };
 }
 
+export interface LegacyTaskSummary {
+  id: string;
+  name: string;
+  status: "running" | "stalled";
+  progress?: number;
+}
+
+export interface BalanceSummary {
+  platform: string;
+  total: number;
+  available: boolean;
+}
+
+export interface LegacyRuntimeSnapshot {
+  tasks: LegacyTaskSummary[];
+  balances: BalanceSummary[];
+}
+
 export interface SessionRoute {
   channelId: string;
   accountId?: string;
@@ -112,13 +130,21 @@ export interface FooterConfig {
   context: boolean;
   cost: boolean;
   totals: boolean;
+  todayTokens: boolean;
+  monthTokens: boolean;
+  backgroundTasks: boolean;
+  balance: boolean;
 }
 
 export interface CardFooterConfig {
   enabled: boolean;
   captureChannels: string[];
+  title: string;
+  accountTitles: Record<string, string>;
   timezone: string;
   storageDir: string;
+  legacyTaskDir: string;
+  balanceCachePath: string;
   updateIntervalMs: number;
   panels: PanelConfig;
   footer: FooterConfig;

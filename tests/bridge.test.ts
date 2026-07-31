@@ -56,7 +56,7 @@ function createHarness(): {
   const instance = new OpenClawCardBridge({
     api,
     config: resolveConfig({
-      storageDir: path.join(os.tmpdir(), "openclaw-feishu-card-footer-test"),
+      storageDir: path.join(os.tmpdir(), "openclaw-hermes-feishu-card-test"),
       panels: { resources: false },
     }),
   });

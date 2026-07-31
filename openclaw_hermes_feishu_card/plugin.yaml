@@ -1,7 +1,7 @@
 name: feishu-platform
 label: Feishu / Lark · CardKit
 kind: platform
-version: 1.0.0
+version: 2.0.0
 description: >
   Feishu CardKit 2.0 streaming presentation for Hermes Agent. Extends Hermes'
   native Feishu transport with unified answer, tool progress, resource and
@@ -26,7 +26,7 @@ optional_env:
     description: "Domain: feishu or lark"
     prompt: "Domain (feishu/lark)"
     password: false
-  - name: FEISHU_CARD_FOOTER_HOME
+  - name: OPENCLAW_HERMES_FEISHU_CARD_HOME
     description: "Shared usage ledger directory"
-    prompt: "Card footer data directory"
+    prompt: "OpenClaw Hermes Feishu Card data directory"
     password: false

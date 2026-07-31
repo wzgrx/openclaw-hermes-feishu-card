@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from hermes_feishu_card_footer.markers import decode_markers, encode_marker, split_reasoning
+from openclaw_hermes_feishu_card.markers import decode_markers, encode_marker, split_reasoning
 
 
 def test_marker_round_trip() -> None:

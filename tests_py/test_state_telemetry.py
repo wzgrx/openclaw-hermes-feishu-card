@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from hermes_feishu_card_footer.models import CardSession
-from hermes_feishu_card_footer.telemetry import TelemetryRegistry
+from openclaw_hermes_feishu_card.models import CardSession
+from openclaw_hermes_feishu_card.telemetry import TelemetryRegistry
 
 
 def test_card_session_finishes_running_tools() -> None:

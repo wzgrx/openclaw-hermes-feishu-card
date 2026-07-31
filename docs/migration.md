@@ -1,5 +1,19 @@
 # 从旧版迁移
 
+## 仓库和插件名称
+
+统一仓库、npm/Python 包和 OpenClaw 插件 ID 为
+`openclaw-hermes-feishu-card`。安装脚本会迁移并清理旧插件 ID
+`openclaw-feishu-card-footer`，并在新数据目录不存在时迁移旧的
+`~/.local/share/openclaw-feishu-card-footer`。
+
+以下兼容入口继续保留一个迁移周期：
+
+- Python 导入 `hermes_feishu_card_footer`
+- CLI `hermes-feishu-card-footer`
+- 环境变量 `FEISHU_CARD_FOOTER_HOME`
+- Hermes 旧版 `card.title`、`card.max_wait_ms`、`card.footer_fields`
+
 ## 从 hermes-lark-streaming 迁移
 
 旧版 `hermes-lark-streaming` 会修改 Hermes 的 `gateway/run.py` 与
@@ -37,12 +51,21 @@ hermes plugins disable hermes-lark-streaming
 7. 分别运行 `openclaw plugins doctor`、`hermes plugins list`。
 8. 重启两个 gateway，并发送一条包含工具调用的测试消息。
 
+## 两个旧仓库的迁移结果
+
+`wzgrx/hermes-feishu-streaming-card` 的多机器人路由、标题优先级、思考标签、
+流式与 cron 卡片、附件摘要、表格限制、严格序列和 fail-open 已合入新状态机。
+
+`wzgrx/openclaw-hermes-card` 的资源/GPU、任务进度、今日/月度累计、
+供应商余额与费用展示已移植。旧项目采用的上游源码覆盖、Python sidecar 和
+进度 HTTP 服务由原生 OpenClaw Hook、Hermes 平台适配器和受限本地缓存读取取代。
+
 ## 回滚
 
 OpenClaw：
 
 ```bash
-openclaw plugins disable openclaw-feishu-card-footer
+openclaw plugins disable openclaw-hermes-feishu-card
 openclaw gateway restart
 ```
 

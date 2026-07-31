@@ -44,9 +44,9 @@ async def test_adapter_send_edit_segment_and_final_lifecycle(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    import hermes_feishu_card_footer.adapter as adapter_module
-    from hermes_feishu_card_footer.adapter import HermesFeishuCardAdapter
-    from hermes_feishu_card_footer.telemetry import telemetry_registry
+    import openclaw_hermes_feishu_card.adapter as adapter_module
+    from openclaw_hermes_feishu_card.adapter import HermesFeishuCardAdapter
+    from openclaw_hermes_feishu_card.telemetry import telemetry_registry
 
     session_id = f"runtime-{uuid4()}"
     FakeCardKit.instances.clear()
@@ -235,3 +235,30 @@ def test_directory_plugin_registration_contract() -> None:
         )
     )
     assert adapter.__class__.__name__ == "HermesFeishuCardAdapter"
+
+
+def test_legacy_card_config_is_translated() -> None:
+    from openclaw_hermes_feishu_card.plugin import _apply_yaml_config
+
+    result = _apply_yaml_config(
+        {
+            "card": {
+                "title": "Legacy Hermes",
+                "max_wait_ms": 900,
+                "footer_fields": ["duration", "model", "input_tokens"],
+            }
+        },
+        {"app_id": "cli_fixture", "app_secret": "secret_fixture"},
+    )
+
+    assert result is not None
+    assert result["card_footer"] == {
+        "title": "Legacy Hermes",
+        "update_interval_ms": 900,
+        "footer": {
+            "elapsed": True,
+            "model": True,
+            "tokens": True,
+            "context": False,
+        },
+    }

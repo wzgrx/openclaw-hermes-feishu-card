@@ -1,13 +1,5 @@
-from __future__ import annotations
+"""Compatibility import for the pre-rename Python package."""
 
-from typing import Any
+from openclaw_hermes_feishu_card import __version__, register
 
-__all__ = ["register"]
-__version__ = "1.0.0"
-
-
-def register(ctx: Any) -> None:
-    """Load the Hermes host integration only when Hermes calls the entry point."""
-    from .plugin import register as register_plugin
-
-    register_plugin(ctx)
+__all__ = ["__version__", "register"]

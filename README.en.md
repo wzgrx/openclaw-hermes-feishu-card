@@ -26,13 +26,13 @@ OpenClaw:
 ```bash
 pnpm build
 openclaw plugins install --link .
-openclaw plugins enable openclaw-feishu-card-footer
+openclaw plugins enable openclaw-hermes-feishu-card
 ```
 
 Hermes:
 
 ```bash
-hermes plugins install wzgrx/openclaw-feishu-card-footer --enable
+hermes plugins install wzgrx/openclaw-hermes-feishu-card --enable
 HERMES_BIN="$(readlink -f "$(command -v hermes)")"
 HERMES_PYTHON="$(dirname "$HERMES_BIN")/python"
 "$HERMES_PYTHON" -m pip install -e ~/.hermes/plugins/feishu-platform

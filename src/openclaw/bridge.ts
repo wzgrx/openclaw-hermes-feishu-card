@@ -7,6 +7,7 @@ import type {
 
 import {
   ResourceSampler,
+  LegacyRuntimeSampler,
   SessionRegistry,
   UsageLedger,
   applyPricing,
@@ -145,6 +146,7 @@ export class OpenClawCardBridge {
   private readonly sessions = new SessionRegistry();
   private readonly ledger: UsageLedger;
   private readonly resourceSampler = new ResourceSampler();
+  private readonly legacyRuntimeSampler: LegacyRuntimeSampler;
   private readonly clients = new Map<string, FeishuCardClient>();
   private readonly flushChains = new Map<string, Promise<boolean>>();
   private readonly timers = new Map<string, NodeJS.Timeout>();
@@ -157,6 +159,10 @@ export class OpenClawCardBridge {
       storageDir: this.config.storageDir,
       timezone: this.config.timezone,
     });
+    this.legacyRuntimeSampler = new LegacyRuntimeSampler(
+      this.config.legacyTaskDir,
+      this.config.balanceCachePath,
+    );
   }
 
   register(): void {
@@ -303,7 +309,7 @@ export class OpenClawCardBridge {
     }
     return {
       cancel: true,
-      reason: "rendered by openclaw-feishu-card-footer",
+      reason: "rendered by openclaw-hermes-feishu-card",
     };
   }
 
@@ -345,7 +351,7 @@ export class OpenClawCardBridge {
       .then(async () => this.flushNow(key))
       .catch((error: unknown) => {
         this.api.logger.error(
-          `[openclaw-feishu-card-footer] update failed: ${String(error)}`,
+          `[openclaw-hermes-feishu-card] update failed: ${String(error)}`,
         );
         return false;
       });
@@ -369,7 +375,7 @@ export class OpenClawCardBridge {
     );
     if (!credentials) {
       this.api.logger.warn(
-        "[openclaw-feishu-card-footer] Feishu credentials were not resolved; native channel delivery remains active",
+        "[openclaw-hermes-feishu-card] Feishu credentials were not resolved; native channel delivery remains active",
       );
       return false;
     }
@@ -382,11 +388,16 @@ export class OpenClawCardBridge {
     const resource = this.config.panels.resources
       ? await this.resourceSampler.sample()
       : undefined;
+    const legacy =
+      this.config.footer.backgroundTasks || this.config.footer.balance
+        ? await this.legacyRuntimeSampler.sample()
+        : undefined;
     const card = renderCard({
       session: snapshot,
       totals: this.ledger.totals(),
       config: this.config,
       ...(resource ? { resource } : {}),
+      ...(legacy ? { legacy } : {}),
     });
     if (!snapshot.cardId) {
       const created = await client.create({

@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+NEW_PLUGIN_ID="openclaw-hermes-feishu-card"
+OLD_PLUGIN_ID="openclaw-feishu-card-footer"
 INSTALL_OPENCLAW=0
 INSTALL_HERMES=0
 RESTART=0
@@ -81,12 +83,64 @@ done
 if ((INSTALL_OPENCLAW)); then
   command -v node >/dev/null
   command -v openclaw >/dev/null
+  OPENCLAW_CONFIG="${OPENCLAW_CONFIG_PATH:-$HOME/.openclaw/openclaw.json}"
+  if [[ -f "$OPENCLAW_CONFIG" ]]; then
+    cp -a "$OPENCLAW_CONFIG" "$OPENCLAW_CONFIG.bak.$(date +%Y%m%d%H%M%S)"
+    node - "$OPENCLAW_CONFIG" "$OLD_PLUGIN_ID" "$NEW_PLUGIN_ID" "$ROOT" <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+const [configPath, oldId, newId, root] = process.argv.slice(2);
+const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+config.plugins ??= {};
+config.plugins.entries ??= {};
+const oldEntry = config.plugins.entries[oldId];
+if (oldEntry && !config.plugins.entries[newId]) {
+  config.plugins.entries[newId] = {
+    ...oldEntry,
+    enabled: true,
+    config: {
+      ...(oldEntry.config ?? {}),
+      title: oldEntry.config?.title ?? "OpenClaw",
+    },
+  };
+}
+delete config.plugins.entries[oldId];
+if (Array.isArray(config.plugins.allow)) {
+  config.plugins.allow = [
+    ...new Set(config.plugins.allow.filter((id) => id !== oldId).concat(newId)),
+  ];
+}
+if (Array.isArray(config.plugins.load?.paths)) {
+  config.plugins.load.paths = config.plugins.load.paths.filter((candidate) => {
+    const normalized = String(candidate).replaceAll("\\", "/");
+    return (
+      normalized !== oldId &&
+      path.basename(normalized) !== oldId &&
+      !normalized.endsWith(`/${oldId}`)
+    );
+  });
+  if (!config.plugins.load.paths.includes(root)) {
+    config.plugins.load.paths.push(root);
+  }
+}
+const temporary = `${configPath}.tmp.${process.pid}`;
+fs.writeFileSync(temporary, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
+fs.renameSync(temporary, configPath);
+NODE
+  fi
+  OLD_STORAGE="$HOME/.local/share/openclaw-feishu-card-footer"
+  NEW_STORAGE="${OPENCLAW_HERMES_FEISHU_CARD_HOME:-$HOME/.local/share/openclaw-hermes-feishu-card}"
+  if [[ -d "$OLD_STORAGE" && ! -e "$NEW_STORAGE" ]]; then
+    mkdir -p "$(dirname "$NEW_STORAGE")"
+    mv "$OLD_STORAGE" "$NEW_STORAGE"
+  fi
+  openclaw plugins disable "$OLD_PLUGIN_ID" >/dev/null 2>&1 || true
   (
     cd "$ROOT"
     run_pnpm install --frozen-lockfile
     run_pnpm check
     openclaw plugins install --link --force .
-    openclaw plugins enable openclaw-feishu-card-footer
+    openclaw plugins enable "$NEW_PLUGIN_ID"
     openclaw plugins doctor
   )
 fi
@@ -122,7 +176,7 @@ if ((INSTALL_HERMES)); then
   fi
   ln -sfn "$ROOT" "$PLUGIN_DIR"
   hermes plugins enable feishu-platform
-  "$HERMES_PYTHON" -m hermes_feishu_card_footer.cli doctor
+  "$HERMES_PYTHON" -m openclaw_hermes_feishu_card.cli doctor
 fi
 
 if ((RESTART)); then

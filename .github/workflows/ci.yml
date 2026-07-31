@@ -51,7 +51,7 @@ jobs:
       - run: python -m pip install '.[hermes,dev]'
       - run: ruff check .
       - run: ruff format --check .
-      - run: mypy hermes_feishu_card_footer
+      - run: mypy openclaw_hermes_feishu_card
       - run: python -c "import gateway; print('Hermes runtime import OK')"
       - run: pytest
       - name: Test Feishu SDK lower bound

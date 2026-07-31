@@ -1,8 +1,8 @@
 {
-  "id": "openclaw-feishu-card-footer",
-  "name": "OpenClaw Feishu Card Footer",
+  "id": "openclaw-hermes-feishu-card",
+  "name": "OpenClaw Hermes Feishu Card",
   "description": "One CardKit reply with tool progress, runtime resources, token totals and cost metrics.",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -16,11 +16,27 @@
         "items": { "type": "string" },
         "default": ["feishu"]
       },
+      "title": {
+        "type": "string",
+        "default": "OpenClaw"
+      },
+      "accountTitles": {
+        "type": "object",
+        "additionalProperties": { "type": "string" },
+        "default": {}
+      },
       "timezone": {
         "type": "string",
         "default": "Asia/Shanghai"
       },
       "storageDir": {
+        "type": "string"
+      },
+      "legacyTaskDir": {
+        "type": "string",
+        "default": "/tmp/openclaw-tasks"
+      },
+      "balanceCachePath": {
         "type": "string"
       },
       "updateIntervalMs": {
@@ -52,7 +68,11 @@
           "cache": { "type": "boolean", "default": true },
           "context": { "type": "boolean", "default": true },
           "cost": { "type": "boolean", "default": true },
-          "totals": { "type": "boolean", "default": true }
+          "totals": { "type": "boolean", "default": true },
+          "todayTokens": { "type": "boolean", "default": true },
+          "monthTokens": { "type": "boolean", "default": true },
+          "backgroundTasks": { "type": "boolean", "default": true },
+          "balance": { "type": "boolean", "default": true }
         }
       },
       "pricing": {

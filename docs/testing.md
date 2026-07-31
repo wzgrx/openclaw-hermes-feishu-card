@@ -21,7 +21,7 @@ pnpm pack --pack-destination artifacts
 pip install -e '.[hermes,dev]'
 ruff check .
 ruff format --check .
-mypy hermes_feishu_card_footer
+mypy openclaw_hermes_feishu_card
 pytest
 python -m build --outdir build/python
 ```
@@ -36,7 +36,7 @@ bash scripts/install-wsl.sh --all
 openclaw plugins doctor
 hermes plugins list
 HERMES_BIN="$(readlink -f "$(command -v hermes)")"
-"$(dirname "$HERMES_BIN")/python" -m hermes_feishu_card_footer.cli doctor
+"$(dirname "$HERMES_BIN")/python" -m openclaw_hermes_feishu_card.cli doctor
 ```
 
 发送三类测试：

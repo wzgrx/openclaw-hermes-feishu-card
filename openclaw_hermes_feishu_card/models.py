@@ -62,6 +62,32 @@ class ResourceSnapshot:
     uptime_seconds: float
     cpu_percent: float | None = None
     load_average_1m: float | None = None
+    gpu_name: str = ""
+    gpu_utilization_percent: float | None = None
+    gpu_memory_used_mib: float | None = None
+    gpu_memory_total_mib: float | None = None
+    gpu_temperature_c: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LegacyTaskSummary:
+    id: str
+    name: str
+    status: Literal["running", "stalled"]
+    progress: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class BalanceSummary:
+    platform: str
+    total: float
+    available: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class LegacyRuntimeSnapshot:
+    tasks: tuple[LegacyTaskSummary, ...] = ()
+    balances: tuple[BalanceSummary, ...] = ()
 
 
 @dataclass(slots=True)
@@ -80,6 +106,7 @@ class CardSession:
     answer: str = ""
     reasoning: str = ""
     notices: list[str] = field(default_factory=list)
+    attachments: list[str] = field(default_factory=list)
     tools: dict[str, ToolStep] = field(default_factory=dict)
     usage: UsageSnapshot = field(default_factory=UsageSnapshot)
     card_id: str | None = None

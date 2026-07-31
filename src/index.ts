@@ -10,8 +10,8 @@ import { resolveConfig } from "./core/config.js";
 import { OpenClawCardBridge } from "./openclaw/bridge.js";
 
 const plugin: OpenClawPluginDefinition = {
-  id: "openclaw-feishu-card-footer",
-  name: "OpenClaw Feishu Card Footer",
+  id: "openclaw-hermes-feishu-card",
+  name: "OpenClaw Hermes Feishu Card",
   description:
     "Feishu CardKit streaming cards with tool progress, resource usage and token totals",
   configSchema: buildJsonPluginConfigSchema(manifest.configSchema),
@@ -19,14 +19,14 @@ const plugin: OpenClawPluginDefinition = {
     const config = resolveConfig(api.pluginConfig);
     if (!config.enabled) {
       api.logger.info(
-        "[openclaw-feishu-card-footer] disabled by configuration",
+        "[openclaw-hermes-feishu-card] disabled by configuration",
       );
       return;
     }
     const bridge = new OpenClawCardBridge({ api, config });
     bridge.register();
     api.logger.info(
-      `[openclaw-feishu-card-footer] active for channels: ${config.captureChannels.join(", ")}`,
+      `[openclaw-hermes-feishu-card] active for channels: ${config.captureChannels.join(", ")}`,
     );
   },
 };

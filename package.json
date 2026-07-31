@@ -1,18 +1,18 @@
 {
-  "name": "openclaw-feishu-card-footer",
-  "version": "1.0.0",
+  "name": "openclaw-hermes-feishu-card",
+  "version": "2.0.0",
   "description": "Feishu CardKit streaming cards and runtime metrics for OpenClaw and Hermes",
   "type": "module",
   "license": "MIT",
   "author": "wzgrx",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wzgrx/openclaw-feishu-card-footer.git"
+    "url": "git+https://github.com/wzgrx/openclaw-hermes-feishu-card.git"
   },
   "bugs": {
-    "url": "https://github.com/wzgrx/openclaw-feishu-card-footer/issues"
+    "url": "https://github.com/wzgrx/openclaw-hermes-feishu-card/issues"
   },
-  "homepage": "https://github.com/wzgrx/openclaw-feishu-card-footer#readme",
+  "homepage": "https://github.com/wzgrx/openclaw-hermes-feishu-card#readme",
   "keywords": [
     "openclaw",
     "hermes-agent",
@@ -44,6 +44,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "balance:check": "node scripts/balance-check.mjs",
     "build": "tsdown",
     "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "compat:openclaw": "node scripts/verify-openclaw-runtime.mjs",

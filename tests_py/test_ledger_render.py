@@ -6,10 +6,18 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from hermes_feishu_card_footer.config import HermesCardConfig
-from hermes_feishu_card_footer.ledger import UsageLedger
-from hermes_feishu_card_footer.models import CardSession, UsageSnapshot, UsageTotals
-from hermes_feishu_card_footer.render import (
+from openclaw_hermes_feishu_card.config import HermesCardConfig
+from openclaw_hermes_feishu_card.ledger import UsageLedger
+from openclaw_hermes_feishu_card.models import (
+    BalanceSummary,
+    CardSession,
+    LegacyRuntimeSnapshot,
+    LegacyTaskSummary,
+    ResourceSnapshot,
+    UsageSnapshot,
+    UsageTotals,
+)
+from openclaw_hermes_feishu_card.render import (
     MAX_CARD_JSON_BYTES,
     MAX_CARD_TABLES,
     count_card_elements,
@@ -65,7 +73,7 @@ def test_ledger_aggregates_day_month_and_all_time(tmp_path) -> None:
 
 
 def test_render_card_has_cardkit_v2_panels(tmp_path) -> None:
-    config = HermesCardConfig.from_extra({"card_footer": {"storage_dir": str(tmp_path)}})
+    config = HermesCardConfig.from_extra({"card_footer": {"storage_dir": str(tmp_path), "title": "Hermes Bot"}})
     session = CardSession(
         id="s1",
         route_key="chat",
@@ -74,12 +82,43 @@ def test_render_card_has_cardkit_v2_panels(tmp_path) -> None:
         metadata=None,
     )
     session.set_answer("hello **Feishu**")
+    session.attachments = ["📎 report.pdf (application/pdf, 12 KB)"]
     session.upsert_tool(tool_id="0", name="search", input_preview='{"q":"test"}')
-    card = render_card(session, UsageTotals(), config, now=session.updated_at)
+    card = render_card(
+        session,
+        UsageTotals(),
+        config,
+        resource=ResourceSnapshot(
+            sampled_at=session.updated_at,
+            memory_used_bytes=1,
+            memory_total_bytes=2,
+            memory_percent=50,
+            uptime_seconds=60,
+            gpu_name="RTX",
+            gpu_utilization_percent=25,
+        ),
+        legacy=LegacyRuntimeSnapshot(
+            tasks=(
+                LegacyTaskSummary(
+                    id="sync",
+                    name="同步知识库",
+                    status="running",
+                    progress=42,
+                ),
+            ),
+            balances=(BalanceSummary(platform="DeepSeek", total=12.34),),
+        ),
+        now=session.updated_at,
+    )
     assert card["schema"] == "2.0"
     assert card["config"]["streaming_mode"] is True
     assert count_card_elements(card) >= 10
     assert "hello" in str(card)
+    assert "Hermes Bot" in str(card)
+    assert "report.pdf" in str(card)
+    assert "RTX" in str(card)
+    assert "同步知识库" in str(card)
+    assert "DeepSeek" in str(card)
 
 
 def test_render_card_enforces_size_and_table_limits(tmp_path) -> None:

@@ -12,6 +12,7 @@ from gateway.session_context import get_session_env
 from plugins.platforms.feishu.adapter import FeishuAdapter
 
 from .client import CardKitClient
+from .compatibility import LegacyRuntimeReader
 from .config import HermesCardConfig
 from .ledger import UsageLedger
 from .markers import decode_markers, encode_marker, split_reasoning
@@ -47,6 +48,25 @@ def _duration_ms(value: object) -> int | None:
     return result if result > 0 else None
 
 
+def _attachment_summaries(metadata: dict[str, Any] | None) -> list[str]:
+    if not metadata:
+        return []
+    raw = metadata.get("attachments") or metadata.get("files") or metadata.get("media")
+    if not isinstance(raw, list):
+        return []
+    summaries: list[str] = []
+    for item in raw:
+        if isinstance(item, str):
+            value = item.strip()
+        elif isinstance(item, dict):
+            value = str(item.get("summary") or item.get("name") or item.get("filename") or "").strip()
+        else:
+            value = ""
+        if value:
+            summaries.append(value[:200])
+    return summaries[:8]
+
+
 class HermesFeishuCardAdapter(FeishuAdapter):  # type: ignore[misc]
     """Hermes' native Feishu transport with CardKit streaming presentation."""
 
@@ -56,6 +76,10 @@ class HermesFeishuCardAdapter(FeishuAdapter):  # type: ignore[misc]
         super().__init__(config)
         self._card_config = HermesCardConfig.from_extra(getattr(config, "extra", None))
         self._ledger = UsageLedger(self._card_config.storage_dir, self._card_config.timezone)
+        self._legacy_runtime = LegacyRuntimeReader(
+            self._card_config.legacy_task_dir,
+            self._card_config.balance_cache_path,
+        )
         self._sessions: dict[str, CardSession] = {}
         self._by_message: dict[str, CardSession] = {}
         self._session_locks: dict[str, asyncio.Lock] = {}
@@ -100,6 +124,7 @@ class HermesFeishuCardAdapter(FeishuAdapter):  # type: ignore[misc]
                 session.reply_to = reply_to
             if metadata:
                 session.metadata = dict(metadata)
+                session.attachments = _attachment_summaries(metadata)
             return session
         if not create:
             return None
@@ -114,6 +139,7 @@ class HermesFeishuCardAdapter(FeishuAdapter):  # type: ignore[misc]
             metadata=dict(metadata) if metadata else None,
             session_id=session_id,
             virtual_message_id=virtual_message_id,
+            attachments=_attachment_summaries(metadata),
         )
         self._sessions[key] = session
         self._by_message[virtual_message_id] = session
@@ -211,6 +237,9 @@ class HermesFeishuCardAdapter(FeishuAdapter):  # type: ignore[misc]
                 totals,
                 self._card_config,
                 resource=sample_resources() if self._card_config.panels.resources else None,
+                legacy=self._legacy_runtime.sample()
+                if self._card_config.footer.background_tasks or self._card_config.footer.balance
+                else None,
                 now=now_ms(),
             )
             client = CardKitClient(self._client)
@@ -322,7 +351,7 @@ class HermesFeishuCardAdapter(FeishuAdapter):  # type: ignore[misc]
         try:
             result = await self._flush(session, force=session.card_id is None or session.status != "running")
         except Exception as exc:
-            logger.warning("[feishu-card-footer] CardKit send failed: %s", exc, exc_info=True)
+            logger.warning("[openclaw-hermes-feishu-card] CardKit send failed: %s", exc, exc_info=True)
             if markers:
                 display = "\n".join(f"⚙️ {marker.get('name', 'tool')}…" for marker in markers)
                 return await super().send(chat_id, display, reply_to=reply_to, metadata=metadata)
@@ -376,7 +405,7 @@ class HermesFeishuCardAdapter(FeishuAdapter):  # type: ignore[misc]
         try:
             result = await self._flush(session, force=finalize)
         except Exception as exc:
-            logger.warning("[feishu-card-footer] CardKit update failed: %s", exc, exc_info=True)
+            logger.warning("[openclaw-hermes-feishu-card] CardKit update failed: %s", exc, exc_info=True)
             if message_id.startswith("hfc-tool-"):
                 return SendResult(success=False, error=str(exc), retryable=True)
             return await super().edit_message(chat_id, message_id, fallback_content, finalize=finalize)

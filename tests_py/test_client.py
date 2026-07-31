@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from hermes_feishu_card_footer.client import CardKitClient, CardKitError
+from openclaw_hermes_feishu_card.client import CardKitClient, CardKitError
 
 
 class FakeCardApi:

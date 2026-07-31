@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { resolve } from "node:path";
 
-const pluginId = "openclaw-feishu-card-footer";
+const pluginId = "openclaw-hermes-feishu-card";
 const larkPluginId = "openclaw-lark";
 const pluginOnly = process.argv.includes("--plugin-only");
 const expectedHooks = [

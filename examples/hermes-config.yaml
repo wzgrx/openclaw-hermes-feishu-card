@@ -7,8 +7,11 @@ platforms:
     connection_mode: websocket
     card_footer:
       enabled: true
+      title: Hermes
       timezone: Asia/Shanghai
-      storage_dir: ~/.local/share/feishu-card-footer
+      storage_dir: ~/.local/share/openclaw-hermes-feishu-card
+      legacy_task_dir: /tmp/openclaw-tasks
+      balance_cache_path: ~/.openclaw/data/balance-cache.json
       update_interval_ms: 800
       panels:
         reasoning: true
@@ -26,6 +29,10 @@ platforms:
         context: true
         cost: true
         totals: true
+        today_tokens: true
+        month_tokens: true
+        background_tasks: true
+        balance: true
       pricing:
         - pattern: openrouter/qwen-*
           currency: USD

@@ -14,11 +14,17 @@
   },
   "plugins": {
     "entries": {
-      "openclaw-feishu-card-footer": {
+      "openclaw-hermes-feishu-card": {
         "enabled": true,
         "config": {
+          "title": "OpenClaw",
+          "accountTitles": {
+            "work": "工作龙虾",
+          },
           "timezone": "Asia/Shanghai",
-          "storageDir": "~/.local/share/feishu-card-footer",
+          "storageDir": "~/.local/share/openclaw-hermes-feishu-card",
+          "legacyTaskDir": "/tmp/openclaw-tasks",
+          "balanceCachePath": "~/.openclaw/data/balance-cache.json",
           "updateIntervalMs": 800,
         },
       },
@@ -48,8 +54,11 @@ platforms:
     domain: feishu
     card_footer:
       enabled: true
+      title: Hermes
       timezone: Asia/Shanghai
-      storage_dir: ~/.local/share/feishu-card-footer
+      storage_dir: ~/.local/share/openclaw-hermes-feishu-card
+      legacy_task_dir: /tmp/openclaw-tasks
+      balance_cache_path: ~/.openclaw/data/balance-cache.json
       update_interval_ms: 800
 ```
 
@@ -85,7 +94,16 @@ footer:
   context: true
   cost: true
   totals: true
+  today_tokens: true
+  month_tokens: true
+  background_tasks: true
+  balance: true
 ```
+
+OpenClaw 使用对应驼峰字段。后台任务读取 `/tmp/openclaw-tasks/*.json`，
+余额读取 `balance-cache.json`；读取器限制文件数和单文件大小，异常数据会被忽略。
+可用 `pnpm balance:check` 从当前 OpenClaw 配置刷新受支持供应商的余额缓存，
+脚本不会输出 API Key。
 
 ## 定价
 

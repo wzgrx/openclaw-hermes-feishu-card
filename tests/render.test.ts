@@ -14,6 +14,10 @@ describe("renderCard", () => {
     const session = new CardSession({
       id: "render-1",
       runtime: "openclaw",
+      route: {
+        channelId: "feishu",
+        accountId: "work",
+      },
       now: Date.parse("2026-07-30T01:00:00Z"),
     });
     session.applyReply("block", "<think>Inspecting</think>Answer in progress");
@@ -41,7 +45,11 @@ describe("renderCard", () => {
 
     const card = renderCard({
       session: session.snapshot(),
-      config: resolveConfig({ storageDir: "./tmp-test" }),
+      config: resolveConfig({
+        storageDir: "./tmp-test",
+        title: "Default Bot",
+        accountTitles: { work: "Work Bot" },
+      }),
       totals: {
         todayTokens: 10_000,
         monthTokens: 100_000,
@@ -60,14 +68,35 @@ describe("renderCard", () => {
         memoryPercent: 50,
         uptimeSeconds: 3_600,
       },
+      legacy: {
+        tasks: [
+          {
+            id: "sync",
+            name: "同步知识库",
+            status: "running",
+            progress: 42,
+          },
+        ],
+        balances: [
+          {
+            platform: "DeepSeek",
+            total: 12.34,
+            available: true,
+          },
+        ],
+      },
       now: Date.parse("2026-07-30T01:00:05Z"),
     });
 
     expect(card.schema).toBe("2.0");
-    expect(JSON.stringify(card)).toContain("System resources");
-    expect(JSON.stringify(card)).toContain("Tool steps");
-    expect(JSON.stringify(card)).toContain("Task progress");
-    expect(JSON.stringify(card)).toContain("Runtime metrics");
+    const serialized = JSON.stringify(card);
+    expect(serialized).toContain("Work Bot");
+    expect(serialized).toContain("System resources");
+    expect(serialized).toContain("Tool steps");
+    expect(serialized).toContain("Task progress");
+    expect(serialized).toContain("Runtime metrics");
+    expect(serialized).toContain("后台任务");
+    expect(serialized).toContain("DeepSeek");
     expect(countCardElements(card)).toBeLessThan(200);
     expect(Buffer.byteLength(JSON.stringify(card), "utf8")).toBeLessThan(
       28_000,
