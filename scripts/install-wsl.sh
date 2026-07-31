@@ -164,7 +164,7 @@ NODE
           cat "$OLD_STORAGE/usage.ndjson" >>"$NEW_STORAGE/usage.ndjson"
           rm -f "$OLD_STORAGE/usage.ndjson"
         fi
-        cp -an "$OLD_STORAGE/." "$NEW_STORAGE/"
+        cp -a --update=none "$OLD_STORAGE/." "$NEW_STORAGE/"
         rm -rf "$OLD_STORAGE"
       fi
     fi
