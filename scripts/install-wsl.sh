@@ -98,13 +98,36 @@ if (oldEntry && !config.plugins.entries[newId]) {
   config.plugins.entries[newId] = {
     ...oldEntry,
     enabled: true,
-    config: {
-      ...(oldEntry.config ?? {}),
-      title: oldEntry.config?.title ?? "OpenClaw",
-    },
   };
 }
 delete config.plugins.entries[oldId];
+const newEntry = config.plugins.entries[newId] ?? { enabled: true };
+const pluginConfig = newEntry.config ?? {};
+const legacyStorageDirs = new Set([
+  "~/.local/share/feishu-card-footer",
+  "~/.local/share/openclaw-feishu-card-footer",
+]);
+newEntry.enabled = true;
+newEntry.config = {
+  ...pluginConfig,
+  title: pluginConfig.title ?? "OpenClaw",
+  accountTitles: pluginConfig.accountTitles ?? {},
+  storageDir:
+    !pluginConfig.storageDir || legacyStorageDirs.has(pluginConfig.storageDir)
+      ? "~/.local/share/openclaw-hermes-feishu-card"
+      : pluginConfig.storageDir,
+  legacyTaskDir: pluginConfig.legacyTaskDir ?? "/tmp/openclaw-tasks",
+  balanceCachePath:
+    pluginConfig.balanceCachePath ?? "~/.openclaw/data/balance-cache.json",
+  footer: {
+    ...(pluginConfig.footer ?? {}),
+    todayTokens: pluginConfig.footer?.todayTokens ?? true,
+    monthTokens: pluginConfig.footer?.monthTokens ?? true,
+    backgroundTasks: pluginConfig.footer?.backgroundTasks ?? true,
+    balance: pluginConfig.footer?.balance ?? true,
+  },
+};
+config.plugins.entries[newId] = newEntry;
 if (Array.isArray(config.plugins.allow)) {
   config.plugins.allow = [
     ...new Set(config.plugins.allow.filter((id) => id !== oldId).concat(newId)),
@@ -128,12 +151,24 @@ fs.writeFileSync(temporary, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o60
 fs.renameSync(temporary, configPath);
 NODE
   fi
-  OLD_STORAGE="$HOME/.local/share/openclaw-feishu-card-footer"
   NEW_STORAGE="${OPENCLAW_HERMES_FEISHU_CARD_HOME:-$HOME/.local/share/openclaw-hermes-feishu-card}"
-  if [[ -d "$OLD_STORAGE" && ! -e "$NEW_STORAGE" ]]; then
-    mkdir -p "$(dirname "$NEW_STORAGE")"
-    mv "$OLD_STORAGE" "$NEW_STORAGE"
-  fi
+  for OLD_STORAGE in \
+    "$HOME/.local/share/feishu-card-footer" \
+    "$HOME/.local/share/openclaw-feishu-card-footer"; do
+    if [[ -d "$OLD_STORAGE" ]]; then
+      if [[ ! -e "$NEW_STORAGE" ]]; then
+        mkdir -p "$(dirname "$NEW_STORAGE")"
+        mv "$OLD_STORAGE" "$NEW_STORAGE"
+      else
+        if [[ -f "$OLD_STORAGE/usage.ndjson" ]]; then
+          cat "$OLD_STORAGE/usage.ndjson" >>"$NEW_STORAGE/usage.ndjson"
+          rm -f "$OLD_STORAGE/usage.ndjson"
+        fi
+        cp -an "$OLD_STORAGE/." "$NEW_STORAGE/"
+        rm -rf "$OLD_STORAGE"
+      fi
+    fi
+  done
   openclaw plugins disable "$OLD_PLUGIN_ID" >/dev/null 2>&1 || true
   (
     cd "$ROOT"

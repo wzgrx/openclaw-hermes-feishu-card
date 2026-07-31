@@ -5,6 +5,7 @@
 统一仓库、npm/Python 包和 OpenClaw 插件 ID 为
 `openclaw-hermes-feishu-card`。安装脚本会迁移并清理旧插件 ID
 `openclaw-feishu-card-footer`，并在新数据目录不存在时迁移旧的
+`~/.local/share/feishu-card-footer` 或
 `~/.local/share/openclaw-feishu-card-footer`。
 
 以下兼容入口继续保留一个迁移周期：
