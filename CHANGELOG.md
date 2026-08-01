@@ -31,6 +31,9 @@
   both entity-only and live diagnostics end in a completed visual state.
 - Expand `doctor` with JSON output, live OpenClaw configuration checks, native
   CardKit/Footer repair, credential redaction and lark-cli raw-API probing.
+- Make `doctor` enforce the pinned pre-migration Builder SHA-256, classic panel
+  toggles and exact two-line footer fields, so a future dependency or runtime
+  configuration drift is detected before it changes the visible card again.
 - Install or repair lark-cli from the WSL installer and synchronize the footer
   subset supported by the `openclaw-lark` direct dispatcher.
 - Persist the nvm-installed `lark-cli` entry under `~/.local/bin` so doctor and

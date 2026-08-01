@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { constants, existsSync, globSync } from "node:fs";
 import {
   access,
@@ -23,6 +24,24 @@ const NATIVE_FOOTER_KEYS = [
   "context",
   "model",
 ];
+const OPTIONAL_FOOTER_KEYS = [
+  "firstToken",
+  "cost",
+  "totals",
+  "todayTokens",
+  "monthTokens",
+  "backgroundTasks",
+  "balance",
+];
+const CLASSIC_PANEL_SETTINGS = {
+  reasoning: true,
+  tools: true,
+  progress: false,
+  resources: false,
+  footer: true,
+};
+const PRE_MIGRATION_BUILDER_SHA256 =
+  "c944060764c2651aacde63db7aef3fd62891767e35367ddfd9b9607670e6553f";
 
 function parseArgs(argv) {
   const options = {
@@ -100,12 +119,18 @@ function applyRuntimeFix(config, root) {
   entry.config.captureChannels = [
     ...new Set([...captures, "feishu", "openclaw-lark"]),
   ];
+  entry.config.panels = {
+    ...(entry.config.panels ?? {}),
+    ...CLASSIC_PANEL_SETTINGS,
+  };
   entry.config.footer ??= {};
   feishu.footer ??= {};
   for (const key of NATIVE_FOOTER_KEYS) {
-    const enabled = entry.config.footer[key] ?? true;
-    entry.config.footer[key] = enabled;
-    feishu.footer[key] = enabled;
+    entry.config.footer[key] = true;
+    feishu.footer[key] = true;
+  }
+  for (const key of OPTIONAL_FOOTER_KEYS) {
+    entry.config.footer[key] = false;
   }
   config.plugins.entries[PLUGIN_ID] = entry;
   config.plugins.entries["openclaw-lark"] = {
@@ -339,6 +364,36 @@ for (const file of [
   }
 }
 
+try {
+  const builderSource = await readFile(
+    resolve(
+      root,
+      "node_modules",
+      "@larksuite",
+      "openclaw-lark",
+      "src",
+      "card",
+      "builder.js",
+    ),
+  );
+  const actualBuilderSha256 = createHash("sha256")
+    .update(builderSource)
+    .digest("hex");
+  check(
+    "pre-migration builder contract",
+    actualBuilderSha256 === PRE_MIGRATION_BUILDER_SHA256,
+    actualBuilderSha256,
+    "Install the pinned @larksuite/openclaw-lark dependency with pnpm install --frozen-lockfile",
+  );
+} catch (error) {
+  check(
+    "pre-migration builder contract",
+    false,
+    error instanceof Error ? error.message : String(error),
+    "Install dependencies with pnpm install --frozen-lockfile",
+  );
+}
+
 let configPath;
 let backupPath;
 if (options.runtime) {
@@ -404,17 +459,41 @@ if (options.runtime) {
       Array.isArray(captures) ? captures.join(", ") : "missing",
       "Run pnpm run doctor -- --fix --runtime",
     );
+    const panelState = pluginEntry?.config?.panels ?? {};
+    check(
+      "classic card panels",
+      Object.entries(CLASSIC_PANEL_SETTINGS).every(
+        ([key, expected]) => panelState[key] === expected,
+      ),
+      Object.entries(CLASSIC_PANEL_SETTINGS)
+        .map(([key]) => `${key}=${String(panelState[key])}`)
+        .join(", "),
+      "Run pnpm run doctor -- --fix --runtime",
+    );
     const footerState = Object.fromEntries(
       NATIVE_FOOTER_KEYS.map((key) => [key, feishu?.footer?.[key]]),
     );
     check(
-      "native footer compatibility",
-      NATIVE_FOOTER_KEYS.every(
-        (key) => typeof feishu?.footer?.[key] === "boolean",
-      ),
+      "native two-line footer",
+      NATIVE_FOOTER_KEYS.every((key) => feishu?.footer?.[key] === true),
       NATIVE_FOOTER_KEYS.map(
         (key) => `${key}=${String(footerState[key])}`,
       ).join(", "),
+      "Run pnpm run doctor -- --fix --runtime",
+    );
+    const pluginFooter = pluginEntry?.config?.footer ?? {};
+    check(
+      "classic footer fields",
+      NATIVE_FOOTER_KEYS.every((key) => pluginFooter[key] === true) &&
+        OPTIONAL_FOOTER_KEYS.every((key) => pluginFooter[key] !== true),
+      [
+        ...NATIVE_FOOTER_KEYS.map(
+          (key) => `${key}=${String(pluginFooter[key])}`,
+        ),
+        ...OPTIONAL_FOOTER_KEYS.map(
+          (key) => `${key}=${String(pluginFooter[key])}`,
+        ),
+      ].join(", "),
       "Run pnpm run doctor -- --fix --runtime",
     );
     check(

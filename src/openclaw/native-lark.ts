@@ -665,7 +665,7 @@ export class NativeLarkIntegration {
         }
       ).version;
       this.api.logger.info(
-        `[openclaw-hermes-feishu-card] integrated @larksuite/openclaw-lark ${version ?? "unknown"}; native streaming cards enriched`,
+        `[openclaw-hermes-feishu-card] integrated @larksuite/openclaw-lark ${version ?? "unknown"}; pre-migration card visuals preserved and runtime metrics linked`,
       );
     } catch (error) {
       this.api.logger.error(
