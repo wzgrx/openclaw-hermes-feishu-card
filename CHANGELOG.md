@@ -2,14 +2,15 @@
 
 ## Unreleased
 
-- Redesign CardKit replies around the answer-first hierarchy: a compact live
-  activity strip while running, the answer as primary content, contextual
-  execution logs and one consolidated run-details panel.
+- Restore the legacy CardKit visual contract from the original project: answer
+  first, one collapsed `思考与工具` timeline, no header on completed native
+  replies, and one x-small footer line for duration/model/token/context data.
 - Replace fabricated progress percentages with truthful task stages, hide
   completed progress chrome, suppress zero-value totals and render failure/tool
   details only when they are relevant.
-- Add status tags, responsive weighted columns, fill-width layout, improved
-  spacing, rounded accordion styling and structured usage/resource metrics.
+- Keep the legacy grey 8px timeline border and natural CardKit body layout;
+  preserve richer runtime metrics internally without expanding the completed
+  card into a separate dashboard.
 - Add an official `larksuite/cli` CardKit adapter with structured dry-run and
   create/send/update/finalize smoke-test flows; credentials stay in the child
   process environment rather than argv.
@@ -49,8 +50,8 @@
   channel's `loadConfig()` contract so real WebSocket inbound messages work on
   both runtime lines.
 - Share direct-dispatch metrics across repeated runtime registrations, keep the
-  answer before execution details, and present model/provider/mode, exact usage,
-  context, cost and first-byte latency in one expanded run-details dashboard.
+  answer before execution details, and map the accurate runtime values into the
+  original compact footer format.
 
 ## 2.0.0
 

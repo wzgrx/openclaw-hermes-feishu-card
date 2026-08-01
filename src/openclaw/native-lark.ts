@@ -146,9 +146,6 @@ const PATCH_STATE = Symbol.for(
 const PATCHED_CONTROLLER = Symbol.for(
   "openclaw-hermes-feishu-card.native-lark-controller-patched",
 );
-const PATCHED_CARDKIT = Symbol.for(
-  "openclaw-hermes-feishu-card.native-lark-cardkit-patched",
-);
 const TEN_MINUTES_MS = 10 * 60 * 1_000;
 
 interface NativeMetricsGlobal {
@@ -363,54 +360,75 @@ function sharedNativeMetricsRegistry(): NativeLarkMetricsRegistry {
   return store.__openclawHermesFeishuCardNativeMetrics;
 }
 
-function exactNumber(value: number): string {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
-    Math.max(0, value),
-  );
+const MODEL_COLOR_PREFIXES: ReadonlyArray<
+  readonly [readonly string[], string]
+> = [
+  [["gpt-", "o1", "o3"], "blue"],
+  [["claude-"], "orange"],
+  [["deepseek-", "deepseek/"], "indigo"],
+  [["kimi-", "kimi/", "moonshot-"], "purple"],
+  [["glm-"], "green"],
+  [["hy3", "tencent/", "hunyuan"], "teal"],
+];
+
+function positiveInteger(value: number | undefined): number {
+  return value !== undefined && Number.isFinite(value)
+    ? Math.max(0, Math.trunc(value))
+    : 0;
 }
 
-function formatDuration(value: number | undefined): string | undefined {
-  if (value === undefined || !Number.isFinite(value)) {
-    return undefined;
+function formatLegacyDuration(valueMs: number | undefined): string {
+  const totalSeconds = Math.max(0, Math.round((valueMs ?? 0) / 1_000));
+  const seconds = totalSeconds % 60;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const minutes = totalMinutes % 60;
+  const hours = Math.floor(totalMinutes / 60);
+  if (hours > 0) {
+    return `${hours}h${minutes}m${seconds}s`;
   }
-  if (value < 1_000) {
-    return `${Math.round(value)}ms`;
+  if (totalMinutes > 0) {
+    return `${totalMinutes}m${seconds}s`;
   }
-  if (value < 60_000) {
-    return `${(value / 1_000).toFixed(1)}s`;
-  }
-  const minutes = Math.floor(value / 60_000);
-  const seconds = Math.round((value % 60_000) / 1_000);
-  return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
 }
 
-const PROVIDER_LABELS: Readonly<Record<string, string>> = {
-  anthropic: "Anthropic",
-  azure: "Azure OpenAI",
-  dashscope: "阿里云百炼",
-  deepseek: "DeepSeek",
-  google: "Google",
-  groq: "Groq",
-  moonshot: "Moonshot",
-  openai: "OpenAI",
-  openrouter: "OpenRouter",
-  qwen: "阿里云百炼",
-  siliconflow: "硅基流动",
-  together: "Together AI",
-  volcengine: "火山引擎",
-  zhipu: "智谱 AI",
-};
+function formatScaled(value: number, factor: number, suffix: string): string {
+  const scaled = value / factor;
+  if (scaled >= 100 || Number.isInteger(scaled)) {
+    return `${Math.round(scaled)}${suffix}`;
+  }
+  return `${scaled.toFixed(1).replace(/\.0$/, "")}${suffix}`;
+}
 
-function providerLabel(provider: string | undefined): string | undefined {
-  const id = provider?.trim();
-  if (!id) {
-    return undefined;
+function formatLegacyCount(value: number | undefined): string {
+  const count = positiveInteger(value);
+  if (count >= 1_000_000) {
+    return formatScaled(count, 1_000_000, "m");
   }
-  const brand = PROVIDER_LABELS[id.toLowerCase()];
-  if (!brand || brand.toLowerCase() === id.toLowerCase()) {
-    return brand ?? id;
+  if (count >= 1_000) {
+    return formatScaled(count, 1_000, "k");
   }
-  return `${brand} (${id})`;
+  return String(count);
+}
+
+function escapeMarkdownHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function coloredModelLabel(value: string | undefined): string {
+  const model = value?.trim() || "Unknown";
+  const normalized = model.toLowerCase();
+  const safe = escapeMarkdownHtml(model);
+  for (const [prefixes, color] of MODEL_COLOR_PREFIXES) {
+    if (prefixes.some((prefix) => normalized.startsWith(prefix))) {
+      return `<font color="${color}">${safe}</font>`;
+    }
+  }
+  return safe;
 }
 
 function footerElements(params: {
@@ -422,143 +440,72 @@ function footerElements(params: {
   if (!config.panels.footer) {
     return [];
   }
-  const summary: string[] = [];
-  if (config.footer.status) {
-    summary.push(
-      data.isError ? "执行异常" : data.isAborted ? "已停止" : "已完成",
-    );
-  }
-  if (config.footer.elapsed) {
-    const elapsed = formatDuration(data.elapsedMs ?? metrics?.durationMs);
-    if (elapsed) {
-      summary.push(`耗时 ${elapsed}`);
+  const segments: string[] = [];
+  if (data.isError || data.isAborted) {
+    segments.push("已停止");
+  } else {
+    if (config.footer.status) {
+      segments.push("已完成");
     }
-  }
-  if (config.footer.firstToken) {
-    const firstToken = formatDuration(metrics?.firstTokenMs);
-    if (firstToken) {
-      summary.push(`首字节 ${firstToken}`);
-    }
-  }
-
-  const rows: string[] = [];
-  if (config.footer.model && metrics) {
-    const provider = providerLabel(metrics.provider);
-    if (metrics.model) {
-      rows.push(`**模型**  ${metrics.model}`);
-    }
-    const mode: string[] = [];
-    if (metrics.reasoningEffort) {
-      mode.push(
-        `推理 ${metrics.reasoningEffort}${metrics.reasoningEffortDefault ? "（默认）" : ""}`,
+    if (config.footer.elapsed) {
+      segments.push(
+        formatLegacyDuration(data.elapsedMs ?? metrics?.durationMs),
       );
     }
-    if (metrics.fastMode === true) {
-      mode.push("快速模式");
+    if (config.footer.model) {
+      segments.push(coloredModelLabel(metrics?.model));
     }
-    const providerAndMode = [
-      provider ? `**提供方**  ${provider}` : undefined,
-      mode.length > 0 ? `**模式**  ${mode.join(" · ")}` : undefined,
-    ].filter(Boolean);
-    if (providerAndMode.length > 0) {
-      rows.push(providerAndMode.join("  ·  "));
+    if (config.footer.tokens) {
+      segments.push(`↑${formatLegacyCount(metrics?.inputTokens)}`);
+      segments.push(`↓${formatLegacyCount(metrics?.outputTokens)}`);
+    }
+    if (config.footer.context) {
+      const used = positiveInteger(metrics?.contextUsedTokens);
+      const maximum = positiveInteger(metrics?.contextTokens);
+      const percent = maximum > 0 ? Math.round((used / maximum) * 100) : 0;
+      segments.push(
+        `ctx ${formatLegacyCount(used)}/${formatLegacyCount(maximum)} ${percent}%`,
+      );
     }
   }
-
-  const usage: string[] = [];
-  if (
-    config.footer.tokens &&
-    metrics?.inputTokens !== undefined &&
-    metrics.outputTokens !== undefined
-  ) {
-    usage.push(
-      `输入 ${exactNumber(metrics.inputTokens)} · 输出 ${exactNumber(metrics.outputTokens)}`,
-    );
-  }
-  if (
-    config.footer.cache &&
-    metrics &&
-    ((metrics.cacheRead ?? 0) > 0 || (metrics.cacheWrite ?? 0) > 0)
-  ) {
-    usage.push(
-      `缓存读 ${exactNumber(metrics.cacheRead ?? 0)} · 缓存写 ${exactNumber(metrics.cacheWrite ?? 0)}`,
-    );
-  }
-  if (usage.length > 0) {
-    rows.push(`**本轮用量**  ${usage.join("  ·  ")}`);
-  }
-  if (
-    config.footer.context &&
-    metrics?.contextUsedTokens !== undefined &&
-    metrics.contextTokens !== undefined &&
-    metrics.contextTokens > 0
-  ) {
-    const percent = Math.min(
-      999,
-      (metrics.contextUsedTokens / metrics.contextTokens) * 100,
-    );
-    const cost =
-      config.footer.cost &&
-      metrics.turnCostUsd !== undefined &&
-      metrics.turnCostUsd > 0
-        ? `  ·  **费用**  $${metrics.turnCostUsd.toFixed(4)}`
-        : "";
-    rows.push(
-      `**上下文**  ${exactNumber(metrics.contextUsedTokens)} / ${exactNumber(metrics.contextTokens)} · ${percent.toFixed(1)}%${cost}`,
-    );
-  } else if (
-    config.footer.cost &&
-    metrics?.turnCostUsd !== undefined &&
-    metrics.turnCostUsd > 0
-  ) {
-    rows.push(`**费用**  $${metrics.turnCostUsd.toFixed(4)}`);
-  }
-
-  if (summary.length === 0 && rows.length === 0) {
+  const content = segments.join(" · ");
+  if (!content) {
     return [];
   }
-  const title = `📊 运行详情${summary.length > 0 ? ` · ${summary.join(" · ")}` : ""}`;
-  const content = rows.join("\n");
   return [
-    { tag: "hr", margin: "6px 0px 2px 0px" },
+    { tag: "hr", element_id: "main_divider" },
     {
-      tag: "collapsible_panel",
-      expanded: true,
-      margin: "2px 0px 0px 0px",
-      header: {
-        title: {
-          tag: "plain_text",
-          content: title,
-          i18n_content: { zh_cn: title, en_us: title },
-        },
-        background_color: "grey",
-        vertical_align: "center",
-        padding: "8px 12px 8px 12px",
-        icon: {
-          tag: "standard_icon",
-          token: "down-small-ccm_outlined",
-          color: "grey",
-          size: "16px 16px",
-        },
-        icon_position: "right",
-        icon_expanded_angle: -180,
-      },
-      border: { color: "grey", corner_radius: "8px" },
-      vertical_spacing: "6px",
-      padding: "10px 12px 10px 12px",
-      elements:
-        content.length > 0
-          ? [
-              {
-                tag: "markdown",
-                content,
-                i18n_content: { zh_cn: content, en_us: content },
-                text_size: "notation",
-              },
-            ]
-          : [],
+      tag: "markdown",
+      element_id: "footer",
+      content,
+      text_size: "x-small",
     },
   ];
+}
+
+function legacyTimelinePanel(
+  panels: UnknownRecord[],
+  toolCount: number,
+): UnknownRecord {
+  const panelElements = panels.flatMap((panel) => {
+    const value = panel.elements;
+    return Array.isArray(value) ? (value as unknown[]) : [];
+  });
+  return {
+    tag: "collapsible_panel",
+    element_id: "auxiliary_timeline",
+    expanded: false,
+    header: {
+      title: {
+        tag: "plain_text",
+        content: `思考与工具 · ${toolCount} 次工具调用`,
+      },
+      vertical_align: "center",
+    },
+    border: { color: "grey", corner_radius: "8px" },
+    padding: "8px 8px 8px 8px",
+    elements: panelElements,
+  };
 }
 
 export function enrichNativeLarkCard(params: {
@@ -568,7 +515,7 @@ export function enrichNativeLarkCard(params: {
 }): Record<string, unknown> {
   const { card, data, config } = params;
   const rawElements: unknown = card.elements;
-  const elements: unknown[] = Array.isArray(rawElements)
+  const sourceElements: unknown[] = Array.isArray(rawElements)
     ? rawElements.map((element: unknown) => element)
     : [];
   const footer = footerElements({
@@ -579,50 +526,50 @@ export function enrichNativeLarkCard(params: {
   // The official complete-card builder renders the execution accordion before
   // the answer. Move the final top-level markdown answer to the front so the
   // result is visually primary and logs remain contextual detail.
-  const answerIndex = elements.findLastIndex(
+  const answerIndex = sourceElements.findLastIndex(
     (element) => record(element).tag === "markdown",
   );
-  if (answerIndex > 0) {
-    const [answer] = elements.splice(answerIndex, 1);
-    if (answer) {
-      elements.unshift(answer);
-    }
+  const answer =
+    answerIndex >= 0 ? sourceElements.splice(answerIndex, 1)[0] : undefined;
+  const panels = sourceElements
+    .filter((element) => record(element).tag === "collapsible_panel")
+    .map(record);
+  const remaining = sourceElements.filter(
+    (element) => record(element).tag !== "collapsible_panel",
+  );
+  const toolCount = Array.isArray(data.toolUseSteps)
+    ? data.toolUseSteps.length
+    : 0;
+  const hasReasoning =
+    typeof data.reasoningText === "string" && data.reasoningText.trim() !== "";
+  const elements: unknown[] = [];
+  if (answer) {
+    elements.push(answer);
+  }
+  elements.push(...remaining);
+  if (panels.length > 0 && (toolCount > 0 || hasReasoning)) {
+    elements.push(legacyTimelinePanel(panels, toolCount));
+  } else if (footer.length > 0) {
+    elements.push({
+      tag: "markdown",
+      element_id: "tool_summary",
+      content: `工具调用 ${toolCount} 次`,
+    });
   }
   elements.push(...footer);
   const accountId = data.footerMetrics?.accountId;
   const title =
     (accountId ? config.accountTitles[accountId] : undefined) ?? config.title;
-  const status = data.isError
-    ? "执行异常"
-    : data.isAborted
-      ? "已停止"
-      : "已完成";
-  const color = data.isError ? "red" : data.isAborted ? "neutral" : "green";
-  const toolCount = Array.isArray(data.toolUseSteps)
-    ? data.toolUseSteps.length
-    : 0;
-  const tags: UnknownRecord[] = [
-    {
-      tag: "text_tag",
-      text: { tag: "plain_text", content: status },
-      color,
-    },
-  ];
-  if (toolCount > 0) {
-    tags.push({
-      tag: "text_tag",
-      text: { tag: "plain_text", content: `${toolCount} 步` },
-      color: "neutral",
-    });
+  if (!data.isError && !data.isAborted) {
+    const withoutHeader = { ...card };
+    delete withoutHeader.header;
+    return { ...withoutHeader, elements };
   }
   return {
     ...card,
     header: {
-      template: data.isError ? "red" : data.isAborted ? "grey" : "green",
-      padding: "12px 16px 12px 16px",
+      template: data.isError ? "red" : "grey",
       title: { tag: "plain_text", content: title },
-      subtitle: { tag: "plain_text", content: "智能任务卡片" },
-      text_tag_list: tags,
     },
     elements,
   };
@@ -817,32 +764,6 @@ export function patchNativeLarkModules(params: {
       });
     };
     builderState[PATCH_STATE] = state;
-  }
-
-  const cardKitBuilder = builder as NativeBuilderModule & {
-    [PATCHED_CARDKIT]?: boolean;
-  };
-  if (!cardKitBuilder[PATCHED_CARDKIT] && builder.toCardKit2) {
-    const originalToCardKit2 = builder.toCardKit2.bind(builder);
-    builder.toCardKit2 = (card) => {
-      const result = originalToCardKit2(card);
-      return {
-        ...result,
-        config: {
-          ...record(result.config),
-          width_mode: "fill",
-          update_multi: true,
-          locales: ["zh_cn", "en_us"],
-        },
-        body: {
-          ...record(result.body),
-          direction: "vertical",
-          vertical_spacing: "12px",
-          padding: "14px 16px 16px 16px",
-        },
-      };
-    };
-    cardKitBuilder[PATCHED_CARDKIT] = true;
   }
 
   const prototype = controller.StreamingCardController

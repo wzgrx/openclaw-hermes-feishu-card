@@ -85,7 +85,7 @@ describe("native @larksuite/openclaw-lark integration", () => {
     });
   });
 
-  it("adds an answer-first header and an expanded structured runtime panel", () => {
+  it("restores the legacy answer-first card, timeline, and compact footer", () => {
     const card = enrichNativeLarkCard({
       card: {
         config: { wide_screen_mode: true },
@@ -113,35 +113,32 @@ describe("native @larksuite/openclaw-lark integration", () => {
       config: resolveConfig({}),
     });
 
-    expect(card.header).toMatchObject({
-      template: "green",
-      title: { content: "OpenClaw" },
-      subtitle: { content: "智能任务卡片" },
-      text_tag_list: [
-        { text: { content: "已完成" } },
-        { text: { content: "1 步" } },
-      ],
-    });
+    expect(card).not.toHaveProperty("header");
     const elements = card.elements as Array<Record<string, unknown>>;
     expect(elements).toHaveLength(4);
     expect(elements[0]?.content).toBe("最终答案");
-    expect(elements.at(-1)?.tag).toBe("collapsible_panel");
-    expect(elements.at(-1)?.header).toMatchObject({
-      title: {
-        content: "📊 运行详情 · 已完成 · 耗时 28.8s · 首字节 5.4s",
+    expect(elements[1]).toMatchObject({
+      tag: "collapsible_panel",
+      element_id: "auxiliary_timeline",
+      expanded: false,
+      header: {
+        title: {
+          tag: "plain_text",
+          content: "思考与工具 · 1 次工具调用",
+        },
+        vertical_align: "center",
       },
+      border: { color: "grey", corner_radius: "8px" },
+      padding: "8px 8px 8px 8px",
     });
-    const runtimeContent = (
-      elements.at(-1)?.elements as Array<Record<string, unknown>>
-    )[0]?.content;
-    expect(runtimeContent).toContain("**模型**  doubao-seed-2-1-turbo-260628");
-    expect(runtimeContent).toContain(
-      "**提供方**  火山引擎 (volcengine)  ·  **模式**  推理 medium（默认）",
-    );
-    expect(runtimeContent).toContain("**本轮用量**  输入 57,370 · 输出 22");
-    expect(runtimeContent).toContain(
-      "**上下文**  57,370 / 256,000 · 22.4%  ·  **费用**  $0.0254",
-    );
+    expect(elements[2]).toEqual({ tag: "hr", element_id: "main_divider" });
+    expect(elements[3]).toEqual({
+      tag: "markdown",
+      element_id: "footer",
+      content:
+        "已完成 · 29s · doubao-seed-2-1-turbo-260628 · ↑57.4k · ↓22 · ctx 57.4k/256k 22%",
+      text_size: "x-small",
+    });
   });
 
   it("patches the channel-owned controller without duplicating its native footer", async () => {
@@ -207,15 +204,21 @@ describe("native @larksuite/openclaw-lark integration", () => {
       status: false,
       model: false,
     });
-    expect(card.elements).toHaveLength(3);
+    expect(card.elements).toHaveLength(4);
+    expect(card.elements[1]).toMatchObject({
+      tag: "markdown",
+      element_id: "tool_summary",
+      content: "工具调用 0 次",
+    });
+    expect(card.elements.at(-1)).toMatchObject({
+      content:
+        '已完成 · 2s · <font color="blue">gpt-test</font> · ↑1k · ↓50 · ctx 1k/10k 10%',
+      text_size: "x-small",
+    });
     const cardKit = builder.toCardKit2(card);
     expect(cardKit).toMatchObject({
-      config: { width_mode: "fill", update_multi: true },
-      body: {
-        direction: "vertical",
-        vertical_spacing: "12px",
-        padding: "14px 16px 16px 16px",
-      },
+      config: {},
+      body: { elements: card.elements },
     });
   });
 
