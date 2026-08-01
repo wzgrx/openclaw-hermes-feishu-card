@@ -108,9 +108,9 @@ const [configPath, oldId, newId, root] = process.argv.slice(2);
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 config.channels ??= {};
 if (config.channels.feishu && typeof config.channels.feishu === "object") {
-  // @larksuite/openclaw-lark 2026.7.x calls the legacy direct reply dispatcher,
-  // which does not install cross-plugin reply_payload_sending modifiers. Keep
-  // its native CardKit controller enabled so Feishu replies remain cards.
+  // The Feishu direct dispatcher skips cross-plugin reply_payload_sending.
+  // Keep streaming enabled; this project registers the versioned official
+  // controller itself and enriches its terminal card in memory.
   config.channels.feishu.streaming = true;
   config.channels.feishu.replyMode = "streaming";
   config.channels.feishu.blockStreaming = false;
@@ -132,8 +132,11 @@ const legacyStorageDirs = new Set([
   "~/.local/share/openclaw-feishu-card-footer",
 ]);
 newEntry.enabled = true;
+newEntry.hooks ??= {};
+newEntry.hooks.allowConversationAccess = true;
 newEntry.config = {
   ...pluginConfig,
+  embeddedLark: true,
   captureChannels: [
     ...new Set([
       ...(Array.isArray(pluginConfig.captureChannels)
@@ -166,6 +169,10 @@ newEntry.config = {
   },
 };
 config.plugins.entries[newId] = newEntry;
+config.plugins.entries["openclaw-lark"] = {
+  ...(config.plugins.entries["openclaw-lark"] ?? {}),
+  enabled: false,
+};
 if (config.channels.feishu && typeof config.channels.feishu === "object") {
   const nativeFooterKeys = [
     "status",
@@ -182,7 +189,11 @@ if (config.channels.feishu && typeof config.channels.feishu === "object") {
 }
 if (Array.isArray(config.plugins.allow)) {
   config.plugins.allow = [
-    ...new Set(config.plugins.allow.filter((id) => id !== oldId).concat(newId)),
+    ...new Set(
+      config.plugins.allow
+        .filter((id) => id !== oldId && id !== "openclaw-lark")
+        .concat(newId),
+    ),
   ];
 }
 if (Array.isArray(config.plugins.load?.paths)) {
@@ -197,6 +208,10 @@ if (Array.isArray(config.plugins.load?.paths)) {
   if (!config.plugins.load.paths.includes(root)) {
     config.plugins.load.paths.push(root);
   }
+}
+if (config.session?.store === "~/.openclaw/sessions/store.json") {
+  delete config.session.store;
+  if (Object.keys(config.session).length === 0) delete config.session;
 }
 const temporary = `${configPath}.tmp.${process.pid}`;
 fs.writeFileSync(temporary, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
@@ -222,6 +237,7 @@ NODE
     fi
   done
   openclaw plugins disable "$OLD_PLUGIN_ID" >/dev/null 2>&1 || true
+  openclaw plugins disable openclaw-lark >/dev/null 2>&1 || true
   (
     cd "$ROOT"
     run_pnpm install --frozen-lockfile

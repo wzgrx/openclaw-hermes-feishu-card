@@ -64,6 +64,7 @@ const footerSchema = z
 
 export const cardFooterConfigSchema = z.object({
   enabled: z.boolean().default(true),
+  embeddedLark: z.boolean().default(true),
   captureChannels: z.array(z.string().min(1)).default(["feishu"]),
   title: z.string().min(1).default("OpenClaw"),
   accountTitles: z.record(z.string(), z.string().min(1)).default({}),

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
-import { constants } from "node:fs";
+import { constants, existsSync, globSync } from "node:fs";
 import {
   access,
   copyFile,
@@ -89,8 +89,11 @@ function applyRuntimeFix(config, root) {
   config.plugins.entries ??= {};
   const entry = config.plugins.entries[PLUGIN_ID] ?? {};
   entry.enabled = true;
+  entry.hooks ??= {};
+  entry.hooks.allowConversationAccess = true;
   entry.config ??= {};
   entry.config.enabled = true;
+  entry.config.embeddedLark = true;
   const captures = Array.isArray(entry.config.captureChannels)
     ? entry.config.captureChannels
     : [];
@@ -105,14 +108,60 @@ function applyRuntimeFix(config, root) {
     feishu.footer[key] = enabled;
   }
   config.plugins.entries[PLUGIN_ID] = entry;
+  config.plugins.entries["openclaw-lark"] = {
+    ...(config.plugins.entries["openclaw-lark"] ?? {}),
+    enabled: false,
+  };
   if (Array.isArray(config.plugins.allow)) {
-    config.plugins.allow = [...new Set([...config.plugins.allow, PLUGIN_ID])];
+    config.plugins.allow = [
+      ...new Set(
+        config.plugins.allow
+          .filter((id) => id !== "openclaw-lark")
+          .concat(PLUGIN_ID),
+      ),
+    ];
   }
   config.plugins.load ??= {};
   config.plugins.load.paths ??= [];
   if (!config.plugins.load.paths.includes(root)) {
     config.plugins.load.paths.push(root);
   }
+  if (config.session?.store === "~/.openclaw/sessions/store.json") {
+    delete config.session.store;
+    if (Object.keys(config.session).length === 0) delete config.session;
+  }
+}
+
+function resolveLarkCliBinary() {
+  const command = process.platform === "win32" ? "lark-cli.cmd" : "lark-cli";
+  const candidates = [
+    process.env.LARKSUITE_CLI_BIN,
+    path.join(os.homedir(), ".volta", "bin", command),
+    ...globSync(
+      path.join(os.homedir(), ".nvm", "versions", "node", "*", "bin", command),
+    ).sort((left, right) =>
+      right.localeCompare(left, undefined, { numeric: true }),
+    ),
+    ...globSync(
+      path.join(
+        os.homedir(),
+        ".local",
+        "share",
+        "southplus",
+        "tools",
+        "node",
+        "*",
+        "bin",
+        command,
+      ),
+    ).sort((left, right) =>
+      right.localeCompare(left, undefined, { numeric: true }),
+    ),
+  ];
+  return (
+    candidates.find((candidate) => candidate && existsSync(candidate)) ??
+    command
+  );
 }
 
 async function larkCliProbe(account) {
@@ -154,7 +203,8 @@ async function larkCliProbe(account) {
     LARKSUITE_CLI_NO_UPDATE_NOTIFIER: "1",
     LARKSUITE_CLI_NO_SKILLS_NOTIFIER: "1",
   };
-  const versionResult = await execFileAsync("lark-cli", ["--version"], {
+  const larkCli = resolveLarkCliBinary();
+  const versionResult = await execFileAsync(larkCli, ["--version"], {
     env: environment,
     timeout: 20_000,
     windowsHide: true,
@@ -174,7 +224,7 @@ async function larkCliProbe(account) {
     data: JSON.stringify(card),
   });
   const probeResult = await execFileAsync(
-    "lark-cli",
+    larkCli,
     [
       "api",
       "POST",
@@ -316,12 +366,26 @@ if (options.runtime) {
     const feishu = activeConfig.channels?.feishu;
     const account = selectedAccount(feishu);
     const pluginEntry = activeConfig.plugins?.entries?.[PLUGIN_ID];
+    const externalLarkEntry = activeConfig.plugins?.entries?.["openclaw-lark"];
     const captures = pluginEntry?.config?.captureChannels;
     check("runtime config", true, configPath);
     check(
       "plugin enabled",
       pluginEntry?.enabled === true && pluginEntry?.config?.enabled !== false,
       String(pluginEntry?.enabled ?? false),
+      "Run pnpm doctor -- --fix --runtime",
+    );
+    check(
+      "conversation metrics hooks",
+      pluginEntry?.hooks?.allowConversationAccess === true,
+      `allowConversationAccess=${String(pluginEntry?.hooks?.allowConversationAccess)}`,
+      "Run pnpm doctor -- --fix --runtime",
+    );
+    check(
+      "integrated Feishu channel",
+      pluginEntry?.config?.embeddedLark === true &&
+        externalLarkEntry?.enabled === false,
+      `embeddedLark=${String(pluginEntry?.config?.embeddedLark)}, external=${String(externalLarkEntry?.enabled)}`,
       "Run pnpm doctor -- --fix --runtime",
     );
     check(
@@ -333,7 +397,7 @@ if (options.runtime) {
       "Run pnpm doctor -- --fix --runtime",
     );
     check(
-      "cross-plugin capture channels",
+      "capture channels",
       Array.isArray(captures) &&
         captures.includes("feishu") &&
         captures.includes("openclaw-lark"),

@@ -4,7 +4,7 @@
 
 一个仓库、两套原生集成和一条官方 CLI 验证链路：
 
-- **OpenClaw / 龙虾**：TypeScript 插件，通过公开 Hook 接管飞书文本回复，使用 CardKit 2.0 创建和更新同一张卡片。
+- **OpenClaw / 龙虾**：TypeScript 插件集成锁定版本的官方飞书通道，在通道自有 CardKit 流式生命周期中增强最终卡片；路由型文本回复仍由标准 Hook 接管。
 - **Hermes Agent**：Python 平台插件，继承 Hermes 原生 `FeishuAdapter`，保留 WebSocket、权限、附件、线程和命令能力，只替换回答的展示层。
 - **lark-cli**：调用官方 `larksuite/cli` 的 raw API 层，提供凭据不进入命令行参数的 CardKit dry-run 和端到端烟雾测试。
 
@@ -12,7 +12,7 @@
 
 ## 设计特点
 
-- 不复制、不覆盖 `@larksuite/openclaw-lark` 或 Hermes 源码。
+- 不改动用户全局安装的 `@larksuite/openclaw-lark` 或 Hermes；官方飞书通道作为锁定依赖随插件加载，发布格式兼容处理只发生在依赖目录中的私有运行时副本。
 - CardKit 2.0 全量更新，严格递增 `sequence`，结束时关闭流式状态。
 - 投递失败时保留上游原生文本链路。
 - 工具进度与回答共用卡片；媒体、审批、文件、语音继续走原生通道。
@@ -25,7 +25,7 @@
   不完整或过期的诊断项默认关闭，并明确标注本地/缓存语义。
 - App Secret 只从现有运行时配置或环境变量读取，日志中不输出凭据。
 - 中文/英文卡片标题与摘要，默认时区为 `Asia/Shanghai`。
-- `doctor --runtime --fix` 可检测并修复 direct dispatcher、原生 Footer、插件启用和 lark-cli CardKit 路由。
+- `doctor --runtime --fix` 可检测并修复集成通道、原生 Footer、重复通道注册和 lark-cli CardKit 路由。
 
 ## 兼容基线
 
@@ -67,11 +67,12 @@ pytest
 ```bash
 pnpm build
 openclaw plugins install --link .
+openclaw plugins disable openclaw-lark
 openclaw plugins enable openclaw-hermes-feishu-card
 openclaw plugins doctor
 ```
 
-将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。使用 `@larksuite/openclaw-lark` 2026.7.x 时，将飞书通道设置为 `streaming: true`、`replyMode: "streaming"`；普通入站回答由标准 `reply_payload_sending` Hook 接管，媒体和原生交互卡片继续交给通道 controller。
+将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。设置 `embeddedLark: true` 并禁用独立的 `openclaw-lark` 条目；本插件会注册同一套官方通道能力，同时在通道 controller 终态读取 `llm_output` 的实际 Provider、模型、推理档位、Token、上下文与费用。媒体和原生交互卡片仍由官方通道逻辑处理。
 
 运行时诊断和自动修复：
 

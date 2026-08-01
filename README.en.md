@@ -2,7 +2,7 @@
 
 A hybrid repository with two native integrations and one official CLI verification transport:
 
-- A TypeScript OpenClaw plugin using the public reply and tool hooks.
+- A TypeScript OpenClaw plugin that registers a version-pinned official Feishu channel, enriches its channel-owned streaming card lifecycle, and retains public reply hooks for routed text delivery.
 - A Python Hermes platform plugin extending Hermes' native `FeishuAdapter`.
 - A `larksuite/cli` raw-API adapter for structured CardKit dry-runs and live lifecycle smoke tests.
 
@@ -33,6 +33,7 @@ OpenClaw:
 ```bash
 pnpm build
 openclaw plugins install --link .
+openclaw plugins disable openclaw-lark
 openclaw plugins enable openclaw-hermes-feishu-card
 pnpm run doctor -- --runtime
 ```
@@ -67,7 +68,7 @@ See [configuration](docs/configuration.md), [architecture](docs/architecture.md)
 
 ## Principles
 
-- Public extension points only; no source-tree patching.
+- The user's global `openclaw-lark` installation stays untouched. The pinned dependency's published CommonJS source entry is normalized in a private runtime copy; card enrichment itself is an in-memory wrapper.
 - Monotonic CardKit sequences and explicit finalization.
 - Fail-open delivery: native text remains active when card delivery fails.
 - Append-only NDJSON usage storage shared across runtimes.

@@ -12,10 +12,23 @@ import { resolve } from "node:path";
 const pluginId = "openclaw-hermes-feishu-card";
 const larkPluginId = "openclaw-lark";
 const pluginOnly = process.argv.includes("--plugin-only");
-const expectedHooks = [
+const bridgeHooks = [
   "after_tool_call",
+  "agent_end",
   "before_tool_call",
   "gateway_stop",
+  "llm_output",
+  "message_received",
+  "reply_payload_sending",
+];
+const embeddedHooks = [
+  "after_tool_call",
+  "after_tool_call",
+  "agent_end",
+  "before_tool_call",
+  "before_tool_call",
+  "gateway_stop",
+  "llm_output",
   "message_received",
   "reply_payload_sending",
 ];
@@ -42,8 +55,12 @@ try {
         plugins: {
           load: { paths: pluginOnly ? [root] : [larkFixture, root] },
           entries: {
-            ...(!pluginOnly ? { [larkPluginId]: { enabled: true } } : {}),
-            [pluginId]: { enabled: true },
+            [larkPluginId]: { enabled: !pluginOnly },
+            [pluginId]: {
+              enabled: true,
+              hooks: { allowConversationAccess: true },
+              config: { embeddedLark: pluginOnly },
+            },
           },
         },
       },
@@ -74,10 +91,11 @@ try {
 
   const details = inspect(pluginId);
   const hooks = [...(details.typedHooks ?? [])].map((hook) => hook.name).sort();
+  const expectedHooks = pluginOnly ? embeddedHooks : bridgeHooks;
 
   if (details.plugin?.status !== "loaded") {
     throw new Error(
-      `expected loaded status, received ${details.plugin?.status}`,
+      `expected loaded status, received ${details.plugin?.status}: ${JSON.stringify(details.plugin?.diagnostics ?? details.diagnostics ?? details.plugin)}`,
     );
   }
   if (details.plugin?.imported !== true) {
@@ -85,7 +103,7 @@ try {
   }
   if (details.plugin?.hookCount !== expectedHooks.length) {
     throw new Error(
-      `expected ${expectedHooks.length} hooks, received ${details.plugin?.hookCount}`,
+      `expected ${expectedHooks.length} hooks, received ${details.plugin?.hookCount}: ${JSON.stringify(hooks)}; channels=${JSON.stringify(details.plugin?.channelIds)}; diagnostics=${JSON.stringify(details.plugin?.diagnostics ?? details.diagnostics)}`,
     );
   }
   if (JSON.stringify(hooks) !== JSON.stringify(expectedHooks)) {
@@ -101,8 +119,13 @@ try {
   }
 
   if (pluginOnly) {
+    if (!details.plugin?.channelIds?.includes("feishu")) {
+      throw new Error(
+        "integrated @larksuite/openclaw-lark did not register feishu",
+      );
+    }
     process.stdout.write(
-      `OpenClaw runtime compatibility: ${hooks.length} hooks verified (plugin-only)\n`,
+      `OpenClaw runtime compatibility: ${hooks.length} hooks and integrated feishu channel verified\n`,
     );
   } else {
     const larkDetails = inspect(larkPluginId);
@@ -119,7 +142,7 @@ try {
     }
 
     process.stdout.write(
-      `OpenClaw runtime compatibility: ${hooks.length} hooks and ${larkPluginId} ${larkDetails.plugin.version} coexistence verified\n`,
+      `OpenClaw runtime compatibility: ${hooks.length} routed hooks and external ${larkPluginId} ${larkDetails.plugin.version} coexistence verified\n`,
     );
   }
 } finally {

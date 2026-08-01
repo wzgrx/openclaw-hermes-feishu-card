@@ -10,29 +10,32 @@
 
 当前发布范围：
 
-| 组件            | 发布范围            | 已验证                                                  |
-| --------------- | ------------------- | ------------------------------------------------------- |
-| OpenClaw        | `>=2026.7.1 <2027`  | npm `2026.7.1-2`                                        |
-| openclaw-lark   | `>=2026.7.16 <2027` | npm `2026.7.16`                                         |
-| Hermes Agent    | `>=0.19.0,<0.20`    | PyPI `0.19.0`、源码标签 `v2026.7.30`（Hermes `0.19.1`） |
-| 飞书 Node SDK   | `^1.72.0`           | `1.72.0`                                                |
-| 飞书 Python SDK | `>=1.6.8,<2`        | `1.6.8`、`1.7.1`                                        |
+| 组件            | 发布范围           | 已验证                                                  |
+| --------------- | ------------------ | ------------------------------------------------------- |
+| OpenClaw        | `>=2026.7.1 <2027` | npm `2026.7.1-2`                                        |
+| openclaw-lark   | `2026.7.16`        | npm `2026.7.16`                                         |
+| Hermes Agent    | `>=0.19.0,<0.20`   | PyPI `0.19.0`、源码标签 `v2026.7.30`（Hermes `0.19.1`） |
+| 飞书 Node SDK   | `^1.72.0`          | `1.72.0`                                                |
+| 飞书 Python SDK | `>=1.6.8,<2`       | `1.6.8`、`1.7.1`                                        |
 
 Hermes `0.19.1` 已发布源码标签，但 PyPI 的最新包仍为 `0.19.0`。Python SDK 下限与 Hermes `0.19.x` 的原生 Feishu extra 对齐，避免安装插件时强制替换宿主已经验证的 SDK。
 
-OpenClaw beta 探针只验证本插件的类型、构建与运行时 Hook。`2026.7.2-beta.5`
-已移除 `openclaw/plugin-sdk` 兼容导出，项目已切换到受支持的
-`openclaw/plugin-sdk/core`；`openclaw-lark 2026.7.16` 仍依赖旧导出，因此
-完整飞书通道联测继续以最新稳定版为准。
+OpenClaw beta 探针验证本插件的类型、构建、运行时 Hook，以及内置飞书通道的
+实际注册。项目自身使用 `openclaw/plugin-sdk/core`；锁定的官方通道依赖仍保留其
+兼容导入，由 OpenClaw 当前运行时解析。
+
+内置加载器会把上游 npm 包的 CommonJS `src` 复制到依赖目录中的版本化私有缓存，
+只在副本中修正缺失包边界和残留 `import.meta` 的发布格式问题。升级官方通道时
+必须先重新执行完整兼容测试，再更新精确版本与转换断言。
 
 ## 被监控的接口契约
 
 ### OpenClaw
 
 - 插件可被运行时加载并完成模块导入。
-- 与 `@larksuite/openclaw-lark` 同时加载，并由后者注册 `feishu` 通道。
-- 注册 `message_received`、`before_tool_call`、`after_tool_call`、`reply_payload_sending`、`gateway_stop` 五个 Hook。
-- `reply_payload_sending` 继续提供可修改的回复载荷与使用量。
+- 内置 `@larksuite/openclaw-lark` 并由本插件注册 `feishu` 通道；独立插件条目禁用。
+- 本项目注册 `llm_output`、`agent_end`、`message_received`、工具、路由型回复与停止 Hook；官方通道同时注册自己的工具追踪 Hook。
+- `llm_output` 为 direct dispatcher 提供真实逐调用用量，`reply_payload_sending` 继续覆盖路由型回复。
 - 飞书通道 ID 保持为 `feishu`。
 
 运行：

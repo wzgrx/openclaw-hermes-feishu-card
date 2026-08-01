@@ -34,7 +34,7 @@ describe("OpenClaw plugin entry point", () => {
   });
 
   it("registers the current hook set", () => {
-    const { api, on, info } = createApi();
+    const { api, on, info } = createApi({ embeddedLark: false });
     expect(plugin.register).toBeTypeOf("function");
     plugin.register?.(api);
 
@@ -46,13 +46,15 @@ describe("OpenClaw plugin entry point", () => {
       }
     }
     expect(hookNames).toEqual([
+      "llm_output",
+      "agent_end",
       "message_received",
       "before_tool_call",
       "after_tool_call",
       "reply_payload_sending",
       "gateway_stop",
     ]);
-    expect(on.mock.calls[3]?.[2]).toEqual({ priority: 100 });
+    expect(on.mock.calls[5]?.[2]).toEqual({ priority: 100 });
     expect(info).toHaveBeenCalledWith(
       expect.stringContaining("active for channels: feishu"),
     );

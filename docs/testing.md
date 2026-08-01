@@ -12,8 +12,9 @@ pnpm compat:openclaw:beta # 安装 openclaw@beta 后运行
 pnpm pack --pack-destination artifacts
 ```
 
-覆盖状态归并、定价、账本、凭据解析、卡片结构和元素上限，并验证插件与
-`@larksuite/openclaw-lark` 可被 OpenClaw 同时加载。
+覆盖状态归并、定价、账本、凭据解析、卡片结构和元素上限，并验证插件能注册
+内置 `@larksuite/openclaw-lark` 的 `feishu` 通道；也验证关闭 `embeddedLark` 时
+与独立通道插件的兼容模式。
 
 ## Python
 

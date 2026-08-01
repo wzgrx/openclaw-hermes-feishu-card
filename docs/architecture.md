@@ -4,7 +4,8 @@
 
 ```mermaid
 flowchart LR
-  OC["OpenClaw hooks"] --> TS["TypeScript session reducer"]
+  OC["OpenClaw llm_output / reply hooks"] --> TS["Runtime metrics + routed reducer"]
+  LARK["Integrated official Feishu controller"] --> TS
   HE["Hermes FeishuAdapter"] --> PY["Python card session"]
   TS --> CK["Feishu CardKit 2.0"]
   PY --> CK
@@ -16,17 +17,16 @@ flowchart LR
 
 ## OpenClaw 路径
 
-1. `message_received` 建立运行、会话、飞书会话的路由关系。
-2. `before_tool_call` / `after_tool_call` 更新工具状态。
-3. `reply_payload_sending` 接收 `tool`、`block`、`final` 文本和 `usageState`。
-4. 首次投递创建 CardKit 实体并把 `card_id` 作为互动消息发送。
-5. 后续投递通过 `PUT /cardkit/v1/cards/:card_id` 更新卡片。
-6. 终态通过 settings API 关闭流式模式。
-7. 只有 CardKit 投递成功后才取消上游文本负载。
+1. 插件在内存中加载并注册锁定版本的官方 `@larksuite/openclaw-lark`；独立的同名插件条目保持禁用，避免重复注册 `feishu` 通道。
+2. 官方 controller 继续负责 WebSocket 入站、流式卡片创建、工具/思考面板、线程回复、媒体和终态关闭。
+3. `llm_output` 按 `sessionKey + runId` 累加每次模型调用，并保留末次调用的真实上下文占用；`agent_end` 补充整轮耗时。
+4. controller 读取内存中的本轮快照，不再依赖旧版 `sessions.json` 文件位置。
+5. 终态 builder 保留官方工具、思考和回答布局，增加品牌 Header，并输出紧凑三行 Footer。
+6. `reply_payload_sending` 继续处理非通道直派、重定向等普通文本路径；CardKit 成功后才取消原负载。
 
-普通 `text` 以及只含 `text/context/divider` 的通用 `presentation` 会进入
-CardKit；带按钮、选择器、置顶请求、媒体或显式飞书卡片的负载继续交给原生
-通道，避免破坏交互语义。
+普通 `text` 以及只含 `text/context/divider` 的通用 `presentation` 可进入路由型
+CardKit bridge；带按钮、选择器、置顶请求、媒体或显式飞书卡片的负载继续交给
+官方通道，避免破坏交互语义。飞书群聊的正常入站回答走上面的集成 controller。
 
 ## Hermes 路径
 
@@ -84,6 +84,6 @@ snake_case 记录。账本按事件 ID 去重、按配置时区实时计算今�
 
 ## 故障隔离
 
-- OpenClaw：凭据解析或 CardKit 调用失败时，不取消原生负载。
+- OpenClaw：集成通道保留官方错误处理；路由型 CardKit bridge 投递失败时不取消原负载。
 - Hermes：CardKit 调用失败时，回答回到父类文本发送；工具事件回到简短文本提示。
 - GPU/主机资源采样属于展示增强，不参与回答投递判定。

@@ -24,6 +24,7 @@ describe("configuration", () => {
     expect(config.footer.backgroundTasks).toBe(false);
     expect(config.footer.balance).toBe(false);
     expect(config.title).toBe("OpenClaw");
+    expect(config.embeddedLark).toBe(true);
     expect(config.captureChannels).toContain("feishu");
   });
 

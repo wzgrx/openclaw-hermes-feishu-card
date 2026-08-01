@@ -16,9 +16,12 @@
   },
   "plugins": {
     "entries": {
+      "openclaw-lark": { "enabled": false },
       "openclaw-hermes-feishu-card": {
         "enabled": true,
+        "hooks": { "allowConversationAccess": true },
         "config": {
+          "embeddedLark": true,
           "title": "OpenClaw",
           "accountTitles": {
             "work": "工作龙虾",
@@ -35,10 +38,13 @@
 }
 ```
 
-OpenClaw 2026.7.x 会在入站 reply dispatcher 上安装
-`reply_payload_sending`，本插件在该 Hook 中接管普通文本回答；富媒体、审批、交互
-控件和上游已构造的原生卡片继续由飞书通道投递。独立的 CLI `--deliver` 等无入站
-上下文路径不用于验证自动接管链路。
+`@larksuite/openclaw-lark` 的飞书入站路径使用通道自有 direct dispatcher，不经过
+跨插件 `reply_payload_sending`。因此默认 `embeddedLark: true`：本插件加载并注册
+锁定版本的官方通道，再在其 controller 终态注入真实运行指标。独立
+`openclaw-lark` 条目必须禁用，避免重复注册 `feishu`；富媒体、审批、交互控件仍由
+官方通道代码处理。`reply_payload_sending` 仅覆盖重定向等路由型普通文本路径。
+OpenClaw 对非内置插件的 `llm_output` / `agent_end` 设有显式会话访问开关，因此
+`hooks.allowConversationAccess` 必须为 `true`；该开关只用于本轮运行指标归并。
 
 插件从以下位置依次解析飞书凭据：
 

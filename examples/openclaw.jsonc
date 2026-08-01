@@ -10,10 +10,14 @@
   },
   "plugins": {
     "entries": {
+      // 本项目内置并注册已锁定版本的官方飞书通道，避免两个 feishu 通道重复注册。
+      "openclaw-lark": { "enabled": false },
       "openclaw-hermes-feishu-card": {
         "enabled": true,
+        "hooks": { "allowConversationAccess": true },
         "config": {
           "enabled": true,
+          "embeddedLark": true,
           "captureChannels": ["feishu", "openclaw-lark"],
           "title": "OpenClaw",
           "accountTitles": {},

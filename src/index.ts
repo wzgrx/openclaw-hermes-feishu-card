@@ -8,6 +8,7 @@ import manifest from "../openclaw.plugin.json" with { type: "json" };
 
 import { resolveConfig } from "./core/config.js";
 import { OpenClawCardBridge } from "./openclaw/bridge.js";
+import { NativeLarkIntegration } from "./openclaw/native-lark.js";
 
 const plugin: OpenClawPluginDefinition = {
   id: "openclaw-hermes-feishu-card",
@@ -23,6 +24,8 @@ const plugin: OpenClawPluginDefinition = {
       );
       return;
     }
+    const nativeLark = new NativeLarkIntegration(api, config);
+    nativeLark.register();
     const bridge = new OpenClawCardBridge({ api, config });
     bridge.register();
     api.logger.info(

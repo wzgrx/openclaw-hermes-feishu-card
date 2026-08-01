@@ -35,18 +35,18 @@ hermes plugins disable hermes-lark-streaming
 
 旧版常见方案会复制或修改 `openclaw-lark` 文件，或者启动独立 Python sidecar。新版改为：
 
-- OpenClaw 公开 Hook 插件
+- OpenClaw 内置锁定版本官方飞书通道，并用运行时 Hook 提供真实指标
 - Hermes 原生 Feishu 平台适配器子类
 - 两端共享 CardKit 展示规范和用量账本
 
-升级 OpenClaw、`@larksuite/openclaw-lark` 或 Hermes 时，不再重复覆盖上游源码。
+升级 OpenClaw、`@larksuite/openclaw-lark` 或 Hermes 时，不再覆盖用户全局安装；锁定依赖的发布格式兼容由插件在私有运行时副本中可复现处理。
 
 ## 迁移步骤
 
 1. 备份 `~/.openclaw/openclaw.json`、`~/.hermes/config.yaml` 和原 systemd user unit。
 2. 停止旧的 `openclaw-hermes-card` / footer sidecar unit。
 3. 恢复被旧脚本修改过的 `@larksuite/openclaw-lark` 安装。
-4. 构建并安装本仓库的 OpenClaw 插件。
+4. 禁用独立 `openclaw-lark` 条目，再构建并安装本仓库的 OpenClaw 插件。
 5. 安装 `feishu-platform` Hermes 用户插件。
 6. 合并 `examples/` 中的配置。
 7. 分别运行 `openclaw plugins doctor`、`hermes plugins list`。

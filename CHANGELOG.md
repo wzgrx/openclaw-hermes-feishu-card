@@ -41,6 +41,10 @@
 - Add route-safe diagnostics for captured replies and successful card delivery.
 - Keep native streaming CardKit enabled for `@larksuite/openclaw-lark` 2026.7.x,
   whose direct dispatcher bypasses cross-plugin reply payload modifiers.
+- Integrate the version-pinned official Feishu channel into this plugin, capture
+  real direct-dispatch metrics from `llm_output`, and enrich the channel-owned
+  terminal card with a branded header plus accurate model, provider, reasoning,
+  token, cache, context and cost lines without relying on a legacy session file.
 
 ## 2.0.0
 

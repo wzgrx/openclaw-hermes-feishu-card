@@ -2,14 +2,14 @@
 
 ## 支持矩阵
 
-| 运行时          | 版本      | 集成面                                                  |
-| --------------- | --------- | ------------------------------------------------------- |
-| OpenClaw        | 2026.7.x  | 入站 dispatcher 使用 `reply_payload_sending`、工具 Hook |
-| openclaw-lark   | 2026.7.x  | 2026.7.16；通道 controller 保留媒体与原生交互卡片       |
-| Hermes Agent    | 0.19.x    | 已验证 PyPI 0.19.0 与源码标签 0.19.1                    |
-| 飞书 Node SDK   | 1.72.x    | CardKit v1、IM v1                                       |
-| 飞书 Python SDK | 1.6.8–1.x | CardKit v1、IM v1                                       |
-| lark-cli        | 1.0.80+   | raw API、JSON envelope、dry-run、bot 环境凭据           |
+| 运行时          | 版本      | 集成面                                            |
+| --------------- | --------- | ------------------------------------------------- |
+| OpenClaw        | 2026.7.x  | `llm_output` / `agent_end`、路由型回复与工具 Hook |
+| openclaw-lark   | 2026.7.x  | 内置 2026.7.16；controller 保留媒体与原生交互卡片 |
+| Hermes Agent    | 0.19.x    | 已验证 PyPI 0.19.0 与源码标签 0.19.1              |
+| 飞书 Node SDK   | 1.72.x    | CardKit v1、IM v1                                 |
+| 飞书 Python SDK | 1.6.8–1.x | CardKit v1、IM v1                                 |
+| lark-cli        | 1.0.80+   | raw API、JSON envelope、dry-run、bot 环境凭据     |
 
 ## 通道职责
 
@@ -24,10 +24,11 @@
 
 上游通道仍负责媒体传输；本插件会在 Hermes 卡片内附加安全截断后的附件摘要。
 
-OpenClaw 2026.7.x 会把 `reply_payload_sending` 安装到入站 dispatcher 的
-`beforeDeliver` 链。本插件只接管普通文本与纯文本 presentation；媒体、审批、按钮、
-位置、语音以及已经构造的飞书原生卡片保持通道投递。独立 CLI `--deliver` 没有入站
-会话上下文，不作为自动接管链路的端到端测试入口。
+飞书 direct dispatcher 不执行跨插件 `reply_payload_sending`。本项目因此以内置依赖
+注册官方通道，并在同一 controller 的终态 builder 中增强卡片；`llm_output` 提供
+Provider、模型、推理档位和逐调用用量，避免从旧 session store 猜测。媒体、审批、
+按钮、位置、语音以及已经构造的飞书原生卡片保持官方通道投递。路由型普通文本仍
+由 `reply_payload_sending` bridge 处理。
 
 官方 lark-cli 适配器不替代在线回复通道。它通过 raw API 验证“应用凭据 →
 CardKit 创建 → IM 发送 → 内容更新 → 关闭流式状态”全链路，默认仅执行

@@ -64,24 +64,20 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@larksuite/openclaw-lark": "2026.7.16",
     "@larksuiteoapi/node-sdk": "^1.72.0",
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "@larksuite/openclaw-lark": ">=2026.7.16 <2027",
     "openclaw": ">=2026.7.1 <2027"
   },
   "peerDependenciesMeta": {
-    "@larksuite/openclaw-lark": {
-      "optional": true
-    },
     "openclaw": {
       "optional": true
     }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@larksuite/openclaw-lark": "^2026.7.16",
     "@types/node": "^26.1.2",
     "eslint": "^10.8.0",
     "openclaw": "^2026.7.1-2",

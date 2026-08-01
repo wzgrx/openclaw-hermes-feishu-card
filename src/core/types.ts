@@ -150,6 +150,7 @@ export interface FooterConfig {
 
 export interface CardFooterConfig {
   enabled: boolean;
+  embeddedLark: boolean;
   captureChannels: string[];
   title: string;
   accountTitles: Record<string, string>;
