@@ -33,12 +33,21 @@ describe("renderCard", () => {
       durationMs: 500,
     });
     session.setUsage({
+      provider: "deepseek",
+      model: "deepseek-v4",
       resolvedRef: "deepseek/deepseek-v4",
+      requestedRef: "router/auto",
+      fallbackUsed: true,
+      reasoningEffort: "high",
       inputTokens: 1_200,
       outputTokens: 300,
       cacheReadTokens: 400,
+      lastInputTokens: 200,
+      lastOutputTokens: 100,
+      lastCacheReadTokens: 400,
       contextUsedTokens: 2_000,
       contextTokenBudget: 128_000,
+      contextSource: "reported",
       turnCost: 0.02,
       currency: "CNY",
     });
@@ -96,6 +105,12 @@ describe("renderCard", () => {
     expect(serialized).toContain("Execution log");
     expect(serialized).toContain("正在持续更新结果");
     expect(serialized).toContain("Run details");
+    expect(serialized).toContain("供应商");
+    expect(serialized).toContain("deepseek-v4");
+    expect(serialized).toContain("模型路由");
+    expect(serialized).toContain("router/auto");
+    expect(serialized).toContain("模型配置");
+    expect(serialized).toContain("末次模型调用");
     expect(serialized).toContain("后台任务");
     expect(serialized).toContain("DeepSeek");
     expect(serialized).not.toContain("100%");

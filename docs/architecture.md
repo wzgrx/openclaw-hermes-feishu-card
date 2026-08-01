@@ -24,6 +24,10 @@ flowchart LR
 6. 终态通过 settings API 关闭流式模式。
 7. 只有 CardKit 投递成功后才取消上游文本负载。
 
+普通 `text` 以及只含 `text/context/divider` 的通用 `presentation` 会进入
+CardKit；带按钮、选择器、置顶请求、媒体或显式飞书卡片的负载继续交给原生
+通道，避免破坏交互语义。
+
 ## Hermes 路径
 
 Hermes 已原生支持 Feishu/Lark，因此本项目不再运行独立 WebSocket sidecar。
@@ -49,6 +53,16 @@ Hermes 已原生支持 Feishu/Lark，因此本项目不再运行独立 WebSocket
 - 回答、思考摘要、工具列表
 - CardKit `card_id`、消息 ID、严格递增 `sequence`
 - 模型、Provider、Token、缓存、上下文和费用
+
+OpenClaw 运行数据按以下优先级归一化：
+
+- 供应商/模型：使用 `resolvedRef` 的实际胜出路由；`requested` 单独保存，
+  仅在回退或路由变化时显示。
+- 上下文占用：`contextUsedTokens` → 末次调用的
+  `input + cacheRead + cacheWrite` → 本轮累计 Prompt。最后一种会标记“估算”。
+- Token：`usage` 表示本轮多调用累计，`lastUsage` 表示末次模型调用，二者不混用。
+- 耗时/费用：优先采用运行时上报的 `durationMs` / `turnUsd`；本地定价只在
+  运行时没有上报费用时生效。
 
 ## 账本
 

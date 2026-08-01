@@ -22,6 +22,9 @@ export function applyPricing(
   usage: UsageSnapshot,
   rules: PricingRule[],
 ): UsageSnapshot {
+  if (usage.turnCost !== undefined && usage.currency) {
+    return usage;
+  }
   const model =
     usage.resolvedRef ??
     (usage.provider && usage.model

@@ -56,6 +56,20 @@ describe("pricing", () => {
       ).turnCost,
     ).toBe(2);
   });
+
+  it("keeps an authoritative runtime-reported cost", () => {
+    expect(
+      applyPricing(
+        {
+          resolvedRef: "deepseek/deepseek-v4",
+          inputTokens: 1_000_000,
+          turnCost: 0.1234,
+          currency: "USD",
+        },
+        rules,
+      ),
+    ).toMatchObject({ turnCost: 0.1234, currency: "USD" });
+  });
 });
 
 describe("UsageLedger", () => {

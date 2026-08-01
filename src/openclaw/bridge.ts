@@ -14,10 +14,10 @@ import {
   renderCard,
   type CardFooterConfig,
   type SessionRoute,
-  type UsageSnapshot,
 } from "../core/index.js";
 import { resolveFeishuCredentials } from "./credentials.js";
 import { FeishuCardClient } from "./feishu-client.js";
+import { normalizeOpenClawUsage } from "./usage.js";
 
 type BeforeToolEvent = {
   toolName: string;
@@ -122,40 +122,6 @@ function resolveConversationId(ctx: MessageContext): string | undefined {
   );
 }
 
-function normalizeUsage(
-  event: PluginHookReplyPayloadSendingEvent,
-): UsageSnapshot | undefined {
-  const state = event.usageState;
-  if (!state) {
-    return undefined;
-  }
-  const usage = state.usage;
-  return {
-    ...(state.provider ? { provider: state.provider } : {}),
-    ...(state.model ? { model: state.model } : {}),
-    ...(state.resolvedRef ? { resolvedRef: state.resolvedRef } : {}),
-    ...(usage?.input !== undefined ? { inputTokens: usage.input } : {}),
-    ...(usage?.output !== undefined ? { outputTokens: usage.output } : {}),
-    ...(usage?.cacheRead !== undefined
-      ? { cacheReadTokens: usage.cacheRead }
-      : {}),
-    ...(usage?.cacheWrite !== undefined
-      ? { cacheWriteTokens: usage.cacheWrite }
-      : {}),
-    ...(usage?.total !== undefined ? { totalTokens: usage.total } : {}),
-    ...(state.contextUsedTokens !== undefined
-      ? { contextUsedTokens: state.contextUsedTokens }
-      : {}),
-    ...(state.contextTokenBudget !== undefined
-      ? { contextTokenBudget: state.contextTokenBudget }
-      : {}),
-    ...(state.durationMs !== undefined ? { durationMs: state.durationMs } : {}),
-    ...(state.turnUsd !== undefined
-      ? { turnCost: state.turnUsd, currency: "USD" as const }
-      : {}),
-  };
-}
-
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -173,12 +139,52 @@ function hasNativeChannelPayload(payload: Record<string, unknown>): boolean {
   );
 }
 
+function presentationHasControls(value: unknown): boolean {
+  const blocks = record(value).blocks;
+  return (
+    Array.isArray(blocks) &&
+    blocks.some((block) => {
+      const type = record(block).type;
+      return type === "buttons" || type === "select";
+    })
+  );
+}
+
+function presentationText(value: unknown): string {
+  const presentation = record(value);
+  const parts: string[] = [];
+  if (typeof presentation.title === "string" && presentation.title.trim()) {
+    parts.push(`**${presentation.title.trim()}**`);
+  }
+  if (Array.isArray(presentation.blocks)) {
+    for (const rawBlock of presentation.blocks) {
+      const block = record(rawBlock);
+      if (
+        (block.type === "text" || block.type === "context") &&
+        typeof block.text === "string" &&
+        block.text.trim()
+      ) {
+        parts.push(block.text.trim());
+      } else if (block.type === "divider") {
+        parts.push("---");
+      }
+    }
+  }
+  return parts.join("\n\n");
+}
+
+function requestsPin(payload: Record<string, unknown>): boolean {
+  const pin = record(payload.delivery).pin;
+  return pin === true || record(pin).enabled === true;
+}
+
 function needsNativeDelivery(payload: Record<string, unknown>): boolean {
   return (
     typeof payload.mediaUrl === "string" ||
     (Array.isArray(payload.mediaUrls) && payload.mediaUrls.length > 0) ||
-    payload.presentation !== undefined ||
+    presentationHasControls(payload.presentation) ||
     payload.interactive !== undefined ||
+    requestsPin(payload) ||
     hasNativeChannelPayload(payload) ||
     payload.btw !== undefined ||
     payload.location !== undefined ||
@@ -321,7 +327,10 @@ export class OpenClawCardBridge {
     if (needsNativeDelivery(payload)) {
       return;
     }
-    const text = typeof payload.text === "string" ? payload.text : "";
+    const text =
+      typeof payload.text === "string" && payload.text.trim()
+        ? payload.text
+        : presentationText(payload.presentation);
     if (!text.trim() && event.kind !== "final") {
       return;
     }
@@ -339,7 +348,7 @@ export class OpenClawCardBridge {
       runtime: "openclaw",
       route: normalizeRoute(ctx),
     });
-    const usage = normalizeUsage(event);
+    const usage = normalizeOpenClawUsage(event.usageState);
     const renderedText =
       payload.isReasoning === true ? `Reasoning:\n${text}` : text;
     session.applyReply(

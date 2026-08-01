@@ -63,6 +63,10 @@ function compactNumber(value: number): string {
   return `${Math.round(value)}`;
 }
 
+function exactNumber(value: number): string {
+  return Math.round(value).toLocaleString("en-US");
+}
+
 function formatDuration(milliseconds: number): string {
   const seconds = Math.max(0, milliseconds) / 1_000;
   if (seconds < 60) {
@@ -353,7 +357,7 @@ function statusText(status: SessionSnapshot["status"]): string {
 
 function money(value: number, currency: "CNY" | "USD" | undefined): string {
   const symbol = currency === "USD" ? "$" : "¥";
-  return `${symbol}${value.toFixed(value < 0.01 ? 4 : 2)}`;
+  return `${symbol}${value.toFixed(value < 1 ? 4 : 2)}`;
 }
 
 function buildDetailsPanel(params: {
@@ -375,7 +379,11 @@ function buildDetailsPanel(params: {
   if (showFooter && config.footer.elapsed) {
     overview.push({
       label: "耗时",
-      value: formatDuration((session.completedAt ?? now) - session.startedAt),
+      value: formatDuration(
+        session.status !== "running" && usage?.durationMs !== undefined
+          ? usage.durationMs
+          : (session.completedAt ?? now) - session.startedAt,
+      ),
     });
   }
   if (showFooter && config.footer.firstToken && session.firstTokenAt) {
@@ -384,21 +392,44 @@ function buildDetailsPanel(params: {
       value: formatDuration(session.firstTokenAt - session.startedAt),
     });
   }
-  if (
-    showFooter &&
-    config.footer.model &&
-    (usage?.resolvedRef ?? usage?.model ?? usage?.provider)
-  ) {
+  if (showFooter && config.footer.model && usage?.provider) {
     overview.push({
-      label: "模型",
-      value:
-        usage?.resolvedRef ??
-        [usage?.provider, usage?.model].filter(Boolean).join("/"),
-      weight: 2,
+      label: "供应商",
+      value: usage.provider,
     });
+  }
+  if (showFooter && config.footer.model && usage?.model) {
+    overview.push({ label: "模型", value: usage.model, weight: 2 });
   }
   if (overview.length > 0) {
     elements.push(...columnRows(overview));
+  }
+
+  const routeLines: string[] = [];
+  if (
+    showFooter &&
+    config.footer.model &&
+    usage?.requestedRef &&
+    usage.resolvedRef &&
+    usage.requestedRef.toLowerCase() !== usage.resolvedRef.toLowerCase()
+  ) {
+    routeLines.push(
+      `**模型路由**  ${usage.requestedRef} → ${usage.resolvedRef}${usage.fallbackUsed ? " · 已回退" : ""}`,
+    );
+  }
+  const modeParts = [
+    usage?.reasoningEffort ? `推理 ${usage.reasoningEffort}` : undefined,
+    usage?.fastMode === true ? "快速模式" : undefined,
+    usage?.overrideSource ? `覆盖来源 ${usage.overrideSource}` : undefined,
+  ].filter(Boolean);
+  if (showFooter && config.footer.model && modeParts.length > 0) {
+    routeLines.push(`**模型配置**  ${modeParts.join(" · ")}`);
+  }
+  if (routeLines.length > 0) {
+    if (elements.length > 0) {
+      elements.push(divider());
+    }
+    elements.push(markdown(routeLines.join("\n"), "notation"));
   }
 
   const usageItems: Array<{ label: string; value: string; weight?: number }> =
@@ -410,8 +441,9 @@ function buildDetailsPanel(params: {
     (usage.inputTokens !== undefined || usage.outputTokens !== undefined)
   ) {
     usageItems.push({
-      label: "本次 Token",
-      value: `↑ ${compactNumber(usage.inputTokens ?? 0)} · ↓ ${compactNumber(usage.outputTokens ?? 0)}`,
+      label: "本轮累计",
+      value: `输入 ${exactNumber(usage.inputTokens ?? 0)} · 输出 ${exactNumber(usage.outputTokens ?? 0)}`,
+      weight: 2,
     });
   }
   if (
@@ -421,19 +453,23 @@ function buildDetailsPanel(params: {
     ((usage.cacheReadTokens ?? 0) > 0 || (usage.cacheWriteTokens ?? 0) > 0)
   ) {
     usageItems.push({
-      label: "缓存 读/写",
-      value: `${compactNumber(usage.cacheReadTokens ?? 0)} / ${compactNumber(usage.cacheWriteTokens ?? 0)}`,
+      label: "本轮缓存",
+      value: `读 ${exactNumber(usage.cacheReadTokens ?? 0)} · 写 ${exactNumber(usage.cacheWriteTokens ?? 0)}`,
+      weight: 2,
     });
   }
-  if (showFooter && config.footer.context && usage?.contextTokenBudget) {
-    const used = usage.contextUsedTokens ?? usage.inputTokens ?? 0;
-    const percent = Math.min(
-      999,
-      Math.round((used / usage.contextTokenBudget) * 100),
-    );
+  if (
+    showFooter &&
+    config.footer.context &&
+    usage?.contextTokenBudget &&
+    usage.contextUsedTokens !== undefined
+  ) {
+    const used = usage.contextUsedTokens;
+    const percent = Math.min(999, (used / usage.contextTokenBudget) * 100);
     usageItems.push({
       label: "上下文",
-      value: `${compactNumber(used)} / ${compactNumber(usage.contextTokenBudget)} · ${percent}%`,
+      value: `${exactNumber(used)} / ${exactNumber(usage.contextTokenBudget)} · ${percent.toFixed(1)}%${usage.contextSource === "aggregate" ? " · 估算" : ""}`,
+      weight: 2,
     });
   }
   if (
@@ -452,6 +488,36 @@ function buildDetailsPanel(params: {
       elements.push(divider());
     }
     elements.push(...columnRows(usageItems));
+  }
+
+  const hasLastCall =
+    usage?.lastInputTokens !== undefined ||
+    usage?.lastOutputTokens !== undefined ||
+    usage?.lastCacheReadTokens !== undefined ||
+    usage?.lastCacheWriteTokens !== undefined;
+  const lastCallDiffers =
+    hasLastCall &&
+    (usage?.lastInputTokens !== usage?.inputTokens ||
+      usage?.lastOutputTokens !== usage?.outputTokens ||
+      usage?.lastCacheReadTokens !== usage?.cacheReadTokens ||
+      usage?.lastCacheWriteTokens !== usage?.cacheWriteTokens);
+  if (showFooter && config.footer.tokens && lastCallDiffers && usage) {
+    const lastParts = [
+      `输入 ${exactNumber(usage.lastInputTokens ?? 0)}`,
+      `输出 ${exactNumber(usage.lastOutputTokens ?? 0)}`,
+      (usage.lastCacheReadTokens ?? 0) > 0
+        ? `缓存读 ${exactNumber(usage.lastCacheReadTokens ?? 0)}`
+        : undefined,
+      (usage.lastCacheWriteTokens ?? 0) > 0
+        ? `缓存写 ${exactNumber(usage.lastCacheWriteTokens ?? 0)}`
+        : undefined,
+    ].filter(Boolean);
+    if (elements.length > 0) {
+      elements.push(divider());
+    }
+    elements.push(
+      markdown(`**末次模型调用**  ${lastParts.join(" · ")}`, "notation"),
+    );
   }
 
   if (showFooter && config.footer.totals && totals.allTimeTokens > 0) {
@@ -602,7 +668,9 @@ function statusTag(status: SessionSnapshot["status"]): {
 
 function headerSubtitle(session: SessionSnapshot, now: number): string {
   const elapsed = formatDuration(
-    (session.completedAt ?? now) - session.startedAt,
+    session.status !== "running" && session.usage?.durationMs !== undefined
+      ? session.usage.durationMs
+      : (session.completedAt ?? now) - session.startedAt,
   );
   const runningTool = session.tools.findLast(
     (step) => step.status === "running",

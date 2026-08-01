@@ -108,13 +108,15 @@ describe("OpenClaw card bridge delivery policy", () => {
     expect(bridge.sessions.get("run-1")).toBeUndefined();
   });
 
-  it("leaves rich and empty payloads on the native delivery path", async () => {
+  it("leaves interactive and empty payloads on the native delivery path", async () => {
     const { bridge, flush } = createHarness();
     const richResult = await bridge.onReplyPayload(
       {
         payload: {
           text: "approval",
-          presentation: { blocks: [] },
+          presentation: {
+            blocks: [{ type: "buttons", buttons: [] }],
+          },
         },
         kind: "final",
         channel: "feishu",
@@ -134,6 +136,34 @@ describe("OpenClaw card bridge delivery policy", () => {
     expect(richResult).toBeUndefined();
     expect(emptyResult).toBeUndefined();
     expect(flush).not.toHaveBeenCalled();
+  });
+
+  it("captures portable text presentations instead of bypassing the plugin", async () => {
+    const { bridge, flush } = createHarness();
+    const result = await bridge.onReplyPayload(
+      {
+        payload: {
+          presentation: {
+            title: "结果",
+            blocks: [
+              { type: "text", text: "第一段" },
+              { type: "divider" },
+              { type: "context", text: "补充信息" },
+            ],
+          },
+        },
+        kind: "block",
+        channel: "feishu",
+        runId: "presentation-run",
+      } as unknown as PluginHookReplyPayloadSendingEvent,
+      context,
+    );
+
+    expect(result).toMatchObject({ cancel: true });
+    expect(flush).toHaveBeenCalledOnce();
+    expect(bridge.sessions.get("presentation-run")?.snapshot().answer).toBe(
+      "**结果**\n\n第一段\n\n---\n\n补充信息",
+    );
   });
 
   it("derives the native Feishu chat id from the canonical session key", () => {

@@ -24,6 +24,16 @@
   reliably replace the built-in minimal card.
 - Treat generic core `channelData` as metadata rather than an automatic native
   delivery opt-out while preserving explicit Feishu cards and rich payloads.
+- Capture channel-agnostic text/context `presentation` blocks while preserving
+  presentations with buttons, selects, pin requests and explicit native cards.
+- Normalize runtime metadata from the resolved model winner, split provider and
+  model into separate fields, retain requested-versus-actual fallback routing,
+  and show reasoning/override configuration only when reported by OpenClaw.
+- Use final-call prompt occupancy for context instead of multi-call aggregate
+  input, label aggregate-only fallback values as estimates, and separate turn
+  totals from the final model call.
+- Prefer runtime-reported duration and cost, preserve exact token/context values,
+  and increase precision for sub-unit costs.
 
 - Force Gateway startup activation so hook-only CardKit delivery is present in
   the live Feishu inbound/reply pipeline instead of loading only in inspection
