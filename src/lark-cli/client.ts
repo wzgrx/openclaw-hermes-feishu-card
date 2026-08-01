@@ -197,25 +197,7 @@ export class LarkCliCardClient {
         message: "conversationId is required for a live CardKit smoke test",
       });
     }
-
-    const created = await this.rawApi({
-      stage: "card.create",
-      method: "POST",
-      path: "/open-apis/cardkit/v1/cards",
-      data: {
-        type: "card_json",
-        data: JSON.stringify(params.card),
-      },
-    });
-    const cardId = findString(created, "card_id");
-    if (!cardId) {
-      throw new LarkCliError({
-        stage: "card.create",
-        message: "CardKit create response did not contain card_id",
-        detail: created,
-      });
-    }
-
+    const cardId = await this.createCard(params.card);
     const sent = await this.rawApi({
       stage: "message.send",
       method: "POST",
@@ -228,15 +210,67 @@ export class LarkCliCardClient {
       },
     });
     const messageId = findString(sent, "message_id");
+    await this.finalizeCard(cardId, params.finalContent);
+    return {
+      dryRun: false,
+      cardId,
+      ...(messageId ? { messageId } : {}),
+    };
+  }
 
+  async smokeEntity(params: {
+    card: CardJson;
+    finalContent: string;
+  }): Promise<LarkCliSmokeResult> {
+    const cardId = await this.createCard(params.card);
+    await this.finalizeCard(cardId, params.finalContent);
+    return { dryRun: false, cardId };
+  }
+
+  private async createCard(card: CardJson): Promise<string> {
+    const created = await this.rawApi({
+      stage: "card.create",
+      method: "POST",
+      path: "/open-apis/cardkit/v1/cards",
+      data: {
+        type: "card_json",
+        data: JSON.stringify(card),
+      },
+    });
+    const cardId = findString(created, "card_id");
+    if (!cardId) {
+      throw new LarkCliError({
+        stage: "card.create",
+        message: "CardKit create response did not contain card_id",
+        detail: created,
+      });
+    }
+    return cardId;
+  }
+
+  private async finalizeCard(
+    cardId: string,
+    finalContent: string,
+  ): Promise<void> {
     await this.rawApi({
       stage: "card.update",
       method: "PUT",
       path: `/open-apis/cardkit/v1/cards/${encodeURIComponent(cardId)}/elements/content/content`,
       data: {
-        content: params.finalContent,
+        content: finalContent,
         sequence: 2,
         uuid: `smoke_update_${Date.now()}`,
+      },
+    });
+
+    await this.rawApi({
+      stage: "card.footer",
+      method: "PUT",
+      path: `/open-apis/cardkit/v1/cards/${encodeURIComponent(cardId)}/elements/footer/content`,
+      data: {
+        content: "已完成 · lark-cli CardKit smoke",
+        sequence: 3,
+        uuid: `smoke_footer_${Date.now()}`,
       },
     });
 
@@ -251,16 +285,10 @@ export class LarkCliCardClient {
             summary: { content: "CardKit smoke test passed" },
           },
         }),
-        sequence: 3,
+        sequence: 4,
         uuid: `smoke_close_${Date.now()}`,
       },
     });
-
-    return {
-      dryRun: false,
-      cardId,
-      ...(messageId ? { messageId } : {}),
-    };
   }
 
   private async rawApi(params: {

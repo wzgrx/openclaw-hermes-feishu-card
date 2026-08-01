@@ -5,6 +5,9 @@
 - Restore the legacy CardKit visual contract from the original project: answer
   first, one collapsed `思考与工具` timeline, no header on completed native
   replies, and one x-small footer line for duration/model/token/context data.
+- Apply the same contract throughout the live lifecycle: indigo thinking state,
+  blue tool-running state, answer-first streaming content, the shared collapsed
+  timeline, and the compact `生成中` footer.
 - Replace fabricated progress percentages with truthful task stages, hide
   completed progress chrome, suppress zero-value totals and render failure/tool
   details only when they are relevant.
@@ -14,10 +17,25 @@
 - Add an official `larksuite/cli` CardKit adapter with structured dry-run and
   create/send/update/finalize smoke-test flows; credentials stay in the child
   process environment rather than argv.
+- Make the official CLI smoke fixture exercise the legacy running-card shape,
+  including its shared timeline, divider, compact spinner footer and element
+  identifiers instead of validating a one-element placeholder card.
+- Add an `--entity` CardKit smoke mode that performs real create/update/finalize
+  API calls without posting a message into a chat, enabling autonomous runtime
+  verification before the explicit end-to-end resend step.
+- Finalize the smoke fixture's compact footer before closing streaming mode, so
+  both entity-only and live diagnostics end in a completed visual state.
 - Expand `doctor` with JSON output, live OpenClaw configuration checks, native
   CardKit/Footer repair, credential redaction and lark-cli raw-API probing.
 - Install or repair lark-cli from the WSL installer and synchronize the footer
   subset supported by the `openclaw-lark` direct dispatcher.
+- Persist the nvm-installed `lark-cli` entry under `~/.local/bin` so doctor and
+  non-interactive smoke-test shells discover the official CLI consistently.
+- Provision a native WSL Corepack `pnpm` shim in the same stable user bin path,
+  removing the hidden dependency on Windows PATH interop during recursive
+  checks, installs and service-oriented maintenance.
+- Document doctor invocations as `pnpm run doctor` so pnpm executes the project
+  diagnostic script rather than its unrelated built-in package-manager doctor.
 - Keep plain-text replies eligible for CardKit rendering when OpenClaw attaches
   delivery routing metadata; rich/media payloads still remain native.
 - Recover native Feishu chat targets from canonical OpenClaw session keys when
@@ -43,9 +61,9 @@
 - Keep native streaming CardKit enabled for `@larksuite/openclaw-lark` 2026.7.x,
   whose direct dispatcher bypasses cross-plugin reply payload modifiers.
 - Integrate the version-pinned official Feishu channel into this plugin, capture
-  real direct-dispatch metrics from `llm_output`, and enrich the channel-owned
-  terminal card with a branded header plus accurate model, provider, reasoning,
-  token, cache, context and cost lines without relying on a legacy session file.
+  real direct-dispatch metrics from `llm_output`, retain accurate model,
+  provider, reasoning, token, cache, context and cost values internally, and map
+  the legacy visible subset without relying on a stale session file.
 - Adapt OpenClaw beta's `runtime.config.current()` surface to the stable official
   channel's `loadConfig()` contract so real WebSocket inbound messages work on
   both runtime lines.

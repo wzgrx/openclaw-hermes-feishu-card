@@ -48,7 +48,7 @@ function parseArgs(argv) {
 
 function usage() {
   return [
-    "Usage: pnpm doctor [--runtime] [--fix] [--json] [--config PATH]",
+    "Usage: pnpm run doctor -- [--runtime] [--fix] [--json] [--config PATH]",
     "",
     "  --runtime  Inspect the active OpenClaw + Feishu + lark-cli chain",
     "  --fix      Back up and repair CardKit runtime settings",
@@ -373,20 +373,20 @@ if (options.runtime) {
       "plugin enabled",
       pluginEntry?.enabled === true && pluginEntry?.config?.enabled !== false,
       String(pluginEntry?.enabled ?? false),
-      "Run pnpm doctor -- --fix --runtime",
+      "Run pnpm run doctor -- --fix --runtime",
     );
     check(
       "conversation metrics hooks",
       pluginEntry?.hooks?.allowConversationAccess === true,
       `allowConversationAccess=${String(pluginEntry?.hooks?.allowConversationAccess)}`,
-      "Run pnpm doctor -- --fix --runtime",
+      "Run pnpm run doctor -- --fix --runtime",
     );
     check(
       "integrated Feishu channel",
       pluginEntry?.config?.embeddedLark === true &&
         externalLarkEntry?.enabled === false,
       `embeddedLark=${String(pluginEntry?.config?.embeddedLark)}, external=${String(externalLarkEntry?.enabled)}`,
-      "Run pnpm doctor -- --fix --runtime",
+      "Run pnpm run doctor -- --fix --runtime",
     );
     check(
       "Feishu native CardKit mode",
@@ -394,7 +394,7 @@ if (options.runtime) {
         feishu?.replyMode === "streaming" &&
         feishu?.blockStreaming === false,
       `streaming=${String(feishu?.streaming)}, replyMode=${String(feishu?.replyMode)}, blockStreaming=${String(feishu?.blockStreaming)}`,
-      "Run pnpm doctor -- --fix --runtime",
+      "Run pnpm run doctor -- --fix --runtime",
     );
     check(
       "capture channels",
@@ -402,7 +402,7 @@ if (options.runtime) {
         captures.includes("feishu") &&
         captures.includes("openclaw-lark"),
       Array.isArray(captures) ? captures.join(", ") : "missing",
-      "Run pnpm doctor -- --fix --runtime",
+      "Run pnpm run doctor -- --fix --runtime",
     );
     const footerState = Object.fromEntries(
       NATIVE_FOOTER_KEYS.map((key) => [key, feishu?.footer?.[key]]),
@@ -415,7 +415,7 @@ if (options.runtime) {
       NATIVE_FOOTER_KEYS.map(
         (key) => `${key}=${String(footerState[key])}`,
       ).join(", "),
-      "Run pnpm doctor -- --fix --runtime",
+      "Run pnpm run doctor -- --fix --runtime",
     );
     check(
       "Feishu credentials",

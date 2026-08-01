@@ -118,6 +118,14 @@ interface NativeBuilderModule extends UnknownRecord {
     state: string,
     data?: NativeCardData,
   ) => Record<string, unknown>;
+  buildStreamingThinkingCard?: (
+    showToolUse?: boolean,
+  ) => Record<string, unknown>;
+  buildStreamingPreAnswerCard?: (params: {
+    steps?: unknown[] | undefined;
+    elapsedMs?: number | undefined;
+    showToolUse?: boolean | undefined;
+  }) => Record<string, unknown>;
   toCardKit2?: (card: Record<string, unknown>) => Record<string, unknown>;
 }
 
@@ -486,11 +494,20 @@ function footerElements(params: {
 function legacyTimelinePanel(
   panels: UnknownRecord[],
   toolCount: number,
+  emptyContent?: string,
 ): UnknownRecord {
   const panelElements = panels.flatMap((panel) => {
     const value = panel.elements;
     return Array.isArray(value) ? (value as unknown[]) : [];
   });
+  if (panelElements.length === 0 && emptyContent) {
+    panelElements.push({
+      tag: "markdown",
+      element_id: "auxiliary_timeline_loading",
+      content: emptyContent,
+      text_size: "x-small",
+    });
+  }
   return {
     tag: "collapsible_panel",
     element_id: "auxiliary_timeline",
@@ -505,6 +522,140 @@ function legacyTimelinePanel(
     border: { color: "grey", corner_radius: "8px" },
     padding: "8px 8px 8px 8px",
     elements: panelElements,
+  };
+}
+
+function runningFooterElements(config: CardFooterConfig): UnknownRecord[] {
+  if (!config.panels.footer) {
+    return [];
+  }
+  return [
+    { tag: "hr", element_id: "main_divider" },
+    {
+      tag: "markdown",
+      element_id: "footer",
+      content: "⠋ 生成中",
+      text_size: "x-small",
+    },
+  ];
+}
+
+function runningHeader(
+  data: NativeCardData,
+  config: CardFooterConfig,
+): UnknownRecord {
+  const steps = Array.isArray(data.toolUseSteps) ? data.toolUseSteps : [];
+  const lastStep = record(steps.at(-1));
+  const stepTitle =
+    typeof lastStep.title === "string"
+      ? lastStep.title.replaceAll(/\s+/g, " ").trim().slice(0, 96)
+      : "";
+  const header: UnknownRecord = {
+    template: steps.length > 0 ? "blue" : "indigo",
+    title: { tag: "plain_text", content: config.title },
+  };
+  if (stepTitle) {
+    header.subtitle = {
+      tag: "plain_text",
+      content: `正在执行：${stepTitle}`,
+    };
+  }
+  return header;
+}
+
+function legacyRunningElements(params: {
+  sourceElements: unknown[];
+  data: NativeCardData;
+  config: CardFooterConfig;
+}): unknown[] {
+  const { sourceElements, data, config } = params;
+  const panels = sourceElements
+    .filter((element) => record(element).tag === "collapsible_panel")
+    .map(record);
+  const withoutPanels = sourceElements.filter(
+    (element) => record(element).tag !== "collapsible_panel",
+  );
+  const mainIndex = withoutPanels.findIndex(
+    (element) => record(element).element_id === "streaming_content",
+  );
+  const fallbackMainIndex = withoutPanels.findLastIndex((element) => {
+    const value = record(element);
+    return value.tag === "markdown" && value.element_id !== "loading_icon";
+  });
+  const selectedIndex = mainIndex >= 0 ? mainIndex : fallbackMainIndex;
+  const main =
+    selectedIndex >= 0 ? withoutPanels.splice(selectedIndex, 1)[0] : undefined;
+  const remaining = withoutPanels.filter((element) => {
+    const value = record(element);
+    return (
+      value.element_id !== "loading_icon" &&
+      value.element_id !== "main_divider" &&
+      value.element_id !== "footer"
+    );
+  });
+  const elements: unknown[] = [];
+  if (main) {
+    const value = record(main);
+    const content =
+      typeof value.content === "string" ? value.content.trim() : "";
+    if (
+      value.element_id === "streaming_content" ||
+      (content !== "Thinking..." && content !== "思考中...")
+    ) {
+      elements.push(main);
+    }
+  }
+  elements.push(...remaining);
+  const toolCount = Array.isArray(data.toolUseSteps)
+    ? data.toolUseSteps.length
+    : 0;
+  if (config.panels.reasoning || config.panels.tools) {
+    elements.push(
+      legacyTimelinePanel(
+        panels,
+        toolCount,
+        '<font color="grey">等待工具事件…</font>',
+      ),
+    );
+  }
+  elements.push(...runningFooterElements(config));
+  return elements;
+}
+
+function enrichNativeLarkRunningCard(params: {
+  card: Record<string, unknown>;
+  data: NativeCardData;
+  config: CardFooterConfig;
+}): Record<string, unknown> {
+  const { card, data, config } = params;
+  const rawElements = card.elements;
+  const sourceElements = Array.isArray(rawElements)
+    ? (rawElements as unknown[])
+    : [];
+  return {
+    ...card,
+    header: runningHeader(data, config),
+    elements: legacyRunningElements({ sourceElements, data, config }),
+  };
+}
+
+function enrichNativeLarkRunningCardKit(params: {
+  card: Record<string, unknown>;
+  data: NativeCardData;
+  config: CardFooterConfig;
+}): Record<string, unknown> {
+  const { card, data, config } = params;
+  const body = record(card.body);
+  const sourceElements = Array.isArray(body.elements)
+    ? (body.elements as unknown[])
+    : [];
+  return {
+    ...card,
+    header: runningHeader(data, config),
+    body: {
+      ...body,
+      elements: legacyRunningElements({ sourceElements, data, config }),
+    },
   };
 }
 
@@ -742,6 +893,13 @@ export function patchNativeLarkModules(params: {
     const state: NativePatchState = { registry, config, logInfo };
     const originalBuild = builder.buildCardContent.bind(builder);
     builder.buildCardContent = (cardState, rawData = {}) => {
+      if (cardState === "streaming" || cardState === "thinking") {
+        return enrichNativeLarkRunningCard({
+          card: originalBuild(cardState, rawData),
+          data: rawData,
+          config: state.config,
+        });
+      }
       if (cardState !== "complete") {
         return originalBuild(cardState, rawData);
       }
@@ -763,6 +921,29 @@ export function patchNativeLarkModules(params: {
         config: state.config,
       });
     };
+    if (builder.buildStreamingThinkingCard) {
+      const originalThinkingCard =
+        builder.buildStreamingThinkingCard.bind(builder);
+      builder.buildStreamingThinkingCard = (showToolUse = true) =>
+        enrichNativeLarkRunningCardKit({
+          card: originalThinkingCard(showToolUse),
+          data: { showToolUse, toolUseSteps: [] },
+          config: state.config,
+        });
+    }
+    if (builder.buildStreamingPreAnswerCard) {
+      const originalPreAnswerCard =
+        builder.buildStreamingPreAnswerCard.bind(builder);
+      builder.buildStreamingPreAnswerCard = (params) =>
+        enrichNativeLarkRunningCardKit({
+          card: originalPreAnswerCard(params),
+          data: {
+            showToolUse: params.showToolUse,
+            toolUseSteps: params.steps ?? [],
+          },
+          config: state.config,
+        });
+    }
     builderState[PATCH_STATE] = state;
   }
 

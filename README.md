@@ -8,7 +8,7 @@
 - **Hermes Agent**：Python 平台插件，继承 Hermes 原生 `FeishuAdapter`，保留 WebSocket、权限、附件、线程和命令能力，只替换回答的展示层。
 - **lark-cli**：调用官方 `larksuite/cli` 的 raw API 层，提供凭据不进入命令行参数的 CardKit dry-run 和端到端烟雾测试。
 
-它把回答、工具步骤、任务进度、思考摘要和真实运行数据集中在一张流式卡片中；模型、Token、上下文和本轮费用始终采用紧凑可见 Footer，主机资源与本地累计只在启用诊断项时折叠展示。
+它把回答、工具步骤、任务进度、思考摘要和真实运行数据集中在一张流式卡片中；完成态沿用旧项目的单行 Footer，只显示耗时、实际模型、Token 和上下文。Provider、缓存、费用与推理档位继续按真实值采集到内部指标和账本，不挤占主卡片版面。
 
 ## 设计特点
 
@@ -16,8 +16,8 @@
 - CardKit 2.0 全量更新，严格递增 `sequence`，结束时关闭流式状态。
 - 投递失败时保留上游原生文本链路。
 - 工具进度与回答共用卡片；媒体、审批、文件、语音继续走原生通道。
-- 供应商品牌、Provider ID 与实际模型同一行显示；回退时同时展示请求模型和实际
-  模型，不把路由名误当模型名。
+- Provider ID、供应商品牌、请求模型与实际模型在运行数据中分别保存；旧版紧凑
+  Footer 只显示实际模型，不把路由名或商家名误当模型名。
 - 上下文使用末次模型调用的真实 Prompt 占用，不使用多工具循环的累计输入量；
   仅有累计值时明确标记为估算。
 - OpenClaw 与 Hermes 可写入同一份追加式 `usage.ndjson`。
@@ -72,7 +72,7 @@ openclaw plugins enable openclaw-hermes-feishu-card
 openclaw plugins doctor
 ```
 
-将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。设置 `embeddedLark: true` 并禁用独立的 `openclaw-lark` 条目；本插件会注册同一套官方通道能力，同时在通道 controller 终态读取 `llm_output` 的实际 Provider、模型、推理档位、Token、上下文与费用。媒体和原生交互卡片仍由官方通道逻辑处理。
+将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。设置 `embeddedLark: true` 并禁用独立的 `openclaw-lark` 条目；本插件会注册同一套官方通道能力，同时在通道 controller 终态读取 `llm_output` 的实际 Provider、模型、推理档位、Token、上下文与费用，再把旧版要求的实际模型、Token 和上下文子集映射到紧凑 Footer。媒体和原生交互卡片仍由官方通道逻辑处理。
 
 运行时诊断和自动修复：
 
@@ -89,6 +89,7 @@ pnpm run doctor -- --runtime --fix
 bash scripts/install-wsl.sh --lark-cli
 pnpm build
 pnpm card:smoke:lark-cli                         # 只生成并检查 raw API 请求
+pnpm card:smoke:lark-cli -- --entity            # 创建、更新并关闭未发送的真实卡片实体
 pnpm card:smoke:lark-cli -- --live --chat-id oc_xxx # 创建、发送、更新、关闭卡片
 ```
 

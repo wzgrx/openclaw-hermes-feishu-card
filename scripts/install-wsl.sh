@@ -23,6 +23,16 @@ if [[ -d "$HOME/.nvm/versions/node" ]]; then
   fi
 fi
 
+# Package scripts call pnpm recursively (for example `pnpm check`). Ensure a
+# native WSL Corepack shim exists instead of depending on a Windows PATH interop
+# command that disappears in systemd and clean non-interactive shells.
+if command -v corepack >/dev/null 2>&1; then
+  mkdir -p "$HOME/.local/bin"
+  if [[ ! -x "$HOME/.local/bin/pnpm" ]]; then
+    corepack enable --install-directory "$HOME/.local/bin" pnpm
+  fi
+fi
+
 run_pnpm() {
   if command -v corepack >/dev/null 2>&1; then
     corepack pnpm "$@"
@@ -91,6 +101,14 @@ if ((INSTALL_LARK_CLI)); then
       cd /tmp
       npm install -g @larksuite/cli@latest
     )
+  fi
+  # npm under nvm installs the executable into a version-specific bin folder.
+  # Keep one stable user-local entry so later non-interactive service/doctor
+  # shells can still discover lark-cli after the installer process exits.
+  LARK_CLI_BIN="$(command -v lark-cli)"
+  mkdir -p "$HOME/.local/bin"
+  if [[ "$LARK_CLI_BIN" != "$HOME/.local/bin/lark-cli" ]]; then
+    ln -sfn "$(readlink -f "$LARK_CLI_BIN")" "$HOME/.local/bin/lark-cli"
   fi
   lark-cli --version
 fi

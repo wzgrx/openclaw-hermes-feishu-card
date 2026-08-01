@@ -7,6 +7,7 @@ import process from "node:process";
 function parseArgs(argv) {
   const options = {
     live: false,
+    entity: false,
     json: false,
     config: process.env.OPENCLAW_CONFIG_PATH,
     chatId: process.env.FEISHU_CHAT_ID,
@@ -18,6 +19,7 @@ function parseArgs(argv) {
     const arg = argv[index];
     if (arg === "--") continue;
     else if (arg === "--live") options.live = true;
+    else if (arg === "--entity") options.entity = true;
     else if (arg === "--json") options.json = true;
     else if (arg === "--config") options.config = argv[++index];
     else if (arg === "--chat-id") options.chatId = argv[++index];
@@ -32,9 +34,10 @@ function parseArgs(argv) {
 
 function usage() {
   return [
-    "Usage: pnpm card:smoke:lark-cli [--live --chat-id CHAT_ID] [options]",
+    "Usage: pnpm card:smoke:lark-cli [--entity|--live --chat-id CHAT_ID] [options]",
     "",
-    "Without --live the command performs a CardKit raw-API dry-run.",
+    "Without --entity or --live the command performs a CardKit raw-API dry-run.",
+    "--entity creates, updates and closes an unsent CardKit entity.",
     "Credentials are read from lark-cli environment variables or OpenClaw config.",
     "",
     "Options:",
@@ -117,6 +120,34 @@ function buildCard(title) {
           content: "正在验证 lark-cli、消息发送和 CardKit 更新链路…",
           element_id: "content",
         },
+        {
+          tag: "collapsible_panel",
+          element_id: "auxiliary_timeline",
+          expanded: false,
+          header: {
+            title: {
+              tag: "plain_text",
+              content: "思考与工具 · 0 次工具调用",
+            },
+            vertical_align: "center",
+          },
+          border: { color: "grey", corner_radius: "8px" },
+          padding: "8px 8px 8px 8px",
+          elements: [
+            {
+              tag: "markdown",
+              content: '<font color="grey">等待工具事件…</font>',
+              text_size: "x-small",
+            },
+          ],
+        },
+        { tag: "hr", element_id: "main_divider" },
+        {
+          tag: "markdown",
+          element_id: "footer",
+          content: "⠋ 生成中",
+          text_size: "x-small",
+        },
       ],
     },
   };
@@ -153,8 +184,15 @@ async function main() {
     process.stdout.write(`${usage()}\n`);
     return;
   }
+  if (options.live && options.entity) {
+    throw new Error("--live and --entity are mutually exclusive");
+  }
   const root = path.resolve(import.meta.dirname, "..");
   const entry = path.resolve(root, "dist", "lark-cli", "index.mjs");
+  const userBin = path.join(os.homedir(), ".local", "bin");
+  process.env.PATH = [userBin, process.env.PATH]
+    .filter(Boolean)
+    .join(path.delimiter);
   try {
     await access(entry);
   } catch {
@@ -164,17 +202,20 @@ async function main() {
   const credentials = await resolveCredentials(options);
   const client = new LarkCliCardClient({ credentials });
   const card = buildCard(options.title);
+  const finalContent = `✅ ${options.text}\n\n- 创建卡片：通过\n- 更新卡片：通过\n- 关闭流式模式：通过`;
   const result = options.live
     ? await client.smoke({
         card,
         conversationId: options.chatId ?? "",
-        finalContent: `✅ ${options.text}\n\n- 创建卡片：通过\n- 发送卡片：通过\n- 更新卡片：通过\n- 关闭流式模式：通过`,
+        finalContent: `${finalContent}\n- 发送卡片：通过`,
       })
-    : await client.dryRun(card);
+    : options.entity
+      ? await client.smokeEntity({ card, finalContent })
+      : await client.dryRun(card);
   const envelope = {
     ok: true,
     command: "lark-cli-cardkit-smoke",
-    mode: options.live ? "live" : "dry-run",
+    mode: options.live ? "live" : options.entity ? "entity" : "dry-run",
     data: result,
   };
   if (options.json) {
@@ -183,7 +224,9 @@ async function main() {
     process.stdout.write(
       options.live
         ? `✓ lark-cli CardKit live smoke passed: card=${result.cardId}, message=${result.messageId ?? "unknown"}\n`
-        : "✓ lark-cli CardKit dry-run passed; use --live --chat-id CHAT_ID for an end-to-end card.\n",
+        : options.entity
+          ? `✓ lark-cli unsent CardKit entity smoke passed: card=${result.cardId}\n`
+          : "✓ lark-cli CardKit dry-run passed; use --entity for a real unsent card or --live --chat-id CHAT_ID for an end-to-end card.\n",
     );
   }
 }
