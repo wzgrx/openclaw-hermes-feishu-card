@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Redesign CardKit replies around the answer-first hierarchy: a compact live
+  activity strip while running, the answer as primary content, contextual
+  execution logs and one consolidated run-details panel.
+- Replace fabricated progress percentages with truthful task stages, hide
+  completed progress chrome, suppress zero-value totals and render failure/tool
+  details only when they are relevant.
+- Add status tags, responsive weighted columns, fill-width layout, improved
+  spacing, rounded accordion styling and structured usage/resource metrics.
 - Add an official `larksuite/cli` CardKit adapter with structured dry-run and
   create/send/update/finalize smoke-test flows; credentials stay in the child
   process environment rather than argv.

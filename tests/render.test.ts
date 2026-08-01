@@ -10,7 +10,7 @@ import {
 import { CardSession } from "../src/core/state.js";
 
 describe("renderCard", () => {
-  it("renders all migrated panels in CardKit 2.0 format", () => {
+  it("renders the redesigned hierarchy in CardKit 2.0 format", () => {
     const session = new CardSession({
       id: "render-1",
       runtime: "openclaw",
@@ -89,18 +89,59 @@ describe("renderCard", () => {
     });
 
     expect(card.schema).toBe("2.0");
+    expect((card.config as Record<string, unknown>).width_mode).toBe("fill");
     const serialized = JSON.stringify(card);
     expect(serialized).toContain("Work Bot");
-    expect(serialized).toContain("System resources");
-    expect(serialized).toContain("Tool steps");
-    expect(serialized).toContain("Task progress");
-    expect(serialized).toContain("Runtime metrics");
+    expect(serialized).toContain("系统资源");
+    expect(serialized).toContain("Execution log");
+    expect(serialized).toContain("正在持续更新结果");
+    expect(serialized).toContain("Run details");
     expect(serialized).toContain("后台任务");
     expect(serialized).toContain("DeepSeek");
+    expect(serialized).not.toContain("100%");
+    expect(serialized.indexOf("Answer in progress")).toBeLessThan(
+      serialized.indexOf("Execution log"),
+    );
     expect(countCardElements(card)).toBeLessThan(200);
     expect(Buffer.byteLength(JSON.stringify(card), "utf8")).toBeLessThan(
       28_000,
     );
+  });
+
+  it("keeps a completed simple reply clean and removes fake progress", () => {
+    const session = new CardSession({
+      id: "simple",
+      runtime: "openclaw",
+      now: Date.parse("2026-07-30T01:00:00Z"),
+    });
+    session.applyReply("final", "这是最终答案。", {
+      resolvedRef: "provider/model",
+      inputTokens: 100,
+      outputTokens: 20,
+    });
+
+    const card = renderCard({
+      session: session.snapshot(),
+      config: resolveConfig({ storageDir: "./tmp-test" }),
+      totals: {
+        todayTokens: 0,
+        monthTokens: 0,
+        allTimeTokens: 0,
+        todayCost: 0,
+        monthCost: 0,
+        allTimeCost: 0,
+      },
+      now: Date.parse("2026-07-30T01:00:05Z"),
+    });
+    const serialized = JSON.stringify(card);
+
+    expect(serialized).toContain("这是最终答案。");
+    expect(serialized).toContain("已完成");
+    expect(serialized).toContain("Run details");
+    expect(serialized).not.toContain("Task progress");
+    expect(serialized).not.toContain("100%");
+    expect(serialized).not.toContain("累计用量");
+    expect(serialized).not.toContain("Execution log");
   });
 
   it("enforces the CardKit byte and markdown-table budgets", () => {

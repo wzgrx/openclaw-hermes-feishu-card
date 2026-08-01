@@ -77,15 +77,50 @@ function formatBytes(bytes: number): string {
   return `${gib.toFixed(gib >= 10 ? 1 : 2)} GiB`;
 }
 
-function markdown(
-  content: string,
-  textSize: string = "normal_v2",
-): CardElement {
+function markdown(content: string, textSize: string = "normal"): CardElement {
   return {
     tag: "markdown",
     content,
     text_size: textSize,
   };
+}
+
+function divider(): CardElement {
+  return { tag: "hr", margin: "4px 0px 4px 0px" };
+}
+
+function columns(
+  items: Array<{ label: string; value: string; weight?: number }>,
+): CardElement {
+  return {
+    tag: "column_set",
+    flex_mode: "none",
+    background_style: "default",
+    horizontal_spacing: "12px",
+    columns: items.map((item) => ({
+      tag: "column",
+      width: "weighted",
+      weight: item.weight ?? 1,
+      vertical_align: "center",
+      elements: [
+        markdown(
+          `<font color='grey'>${item.label}</font>\n**${item.value}**`,
+          "notation",
+        ),
+      ],
+    })),
+  };
+}
+
+function columnRows(
+  items: Array<{ label: string; value: string; weight?: number }>,
+): CardElement[] {
+  const rowSize = items.length === 4 ? 2 : 3;
+  const rows: CardElement[] = [];
+  for (let index = 0; index < items.length; index += rowSize) {
+    rows.push(columns(items.slice(index, index + rowSize)));
+  }
+  return rows;
 }
 
 function fitCardByteBudget(card: CardJson): CardJson {
@@ -153,18 +188,19 @@ function panel(params: {
   return {
     tag: "collapsible_panel",
     expanded: params.expanded,
+    margin: "4px 0px 0px 0px",
     header: {
       title: {
-        tag: "plain_text",
-        content: `${params.emoji} ${params.titleEn}`,
+        tag: "markdown",
+        content: `**${params.emoji} ${params.titleEn}**`,
         i18n_content: {
-          zh_cn: `${params.emoji} ${params.titleZh}`,
-          en_us: `${params.emoji} ${params.titleEn}`,
+          zh_cn: `**${params.emoji} ${params.titleZh}**`,
+          en_us: `**${params.emoji} ${params.titleEn}**`,
         },
-        text_color: "grey",
-        text_size: "notation",
       },
+      background_color: "grey",
       vertical_align: "center",
+      padding: "8px 12px 8px 12px",
       icon: {
         tag: "standard_icon",
         token: "down-small-ccm_outlined",
@@ -174,9 +210,9 @@ function panel(params: {
       icon_position: "right",
       icon_expanded_angle: -180,
     },
-    border: { color: "grey", corner_radius: "5px" },
-    vertical_spacing: "4px",
-    padding: "8px 8px 8px 8px",
+    border: { color: "grey", corner_radius: "8px" },
+    vertical_spacing: "8px",
+    padding: "10px 12px 12px 12px",
     elements: params.elements,
   };
 }
@@ -197,20 +233,25 @@ function buildToolsPanel(tools: ToolStep[]): CardElement | undefined {
     return undefined;
   }
   const visible = tools.slice(-MAX_TOOL_STEPS);
-  const elements = visible.flatMap((step): CardElement[] => {
+  const elements = visible.flatMap((step, index): CardElement[] => {
     const duration =
       step.durationMs === undefined
         ? ""
         : ` · ${formatDuration(step.durationMs)}`;
     const details = [
       step.inputPreview
-        ? `**Input**\n\`\`\`json\n${step.inputPreview}\n\`\`\``
+        ? `<font color='grey'>输入</font>\n\`\`\`json\n${step.inputPreview}\n\`\`\``
         : "",
-      step.error ?? step.outputPreview,
+      step.error
+        ? `<font color='red'>${step.error}</font>`
+        : step.outputPreview
+          ? `<font color='grey'>结果</font>\n${step.outputPreview}`
+          : "",
     ]
       .filter(Boolean)
       .join("\n\n");
     return [
+      ...(index > 0 ? [divider()] : []),
       markdown(
         `${toolIcon(step.status)} **${step.name}**${duration}`,
         "notation",
@@ -218,60 +259,83 @@ function buildToolsPanel(tools: ToolStep[]): CardElement | undefined {
       ...(details ? [markdown(details, "notation")] : []),
     ];
   });
+  const completed = tools.filter((step) => step.status === "completed").length;
+  const failed = tools.filter((step) => step.status === "failed").length;
+  const running = tools.filter((step) => step.status === "running").length;
+  const summary = [
+    `${completed} 已完成`,
+    ...(running ? [`${running} 执行中`] : []),
+    ...(failed ? [`${failed} 失败`] : []),
+  ].join(" · ");
   return panel({
-    titleZh: `工具步骤 · ${tools.length}`,
-    titleEn: `Tool steps · ${tools.length}`,
+    titleZh: `执行记录 · ${summary}`,
+    titleEn: `Execution log · ${tools.length} steps`,
     emoji: "🛠️",
-    expanded: false,
+    expanded: running > 0 || failed > 0,
     elements,
   });
 }
 
-function buildProgressPanel(session: SessionSnapshot): CardElement {
+function buildActivityStrip(
+  session: SessionSnapshot,
+  now: number,
+): CardElement | undefined {
+  if (session.status !== "running") {
+    return undefined;
+  }
   const total = session.tools.length;
   const settled = session.tools.filter(
     (step) => step.status !== "running",
   ).length;
-  const percent =
-    session.status === "completed"
-      ? 100
-      : total > 0
-        ? Math.round((settled / total) * 100)
-        : 5;
-  const bars = Math.round(percent / 5);
-  const bar = `${"█".repeat(bars)}${"░".repeat(20 - bars)}`;
   const running = session.tools
     .filter((step) => step.status === "running")
     .map((step) => step.name);
-  const detail = running.length > 0 ? `\n\n⏳ ${running.join(" · ")}` : "";
-  return panel({
-    titleZh: `任务进度 · ${percent}%`,
-    titleEn: `Task progress · ${percent}%`,
-    emoji: "📊",
-    expanded: session.status === "running",
-    elements: [markdown(`\`${bar}\` **${percent}%**${detail}`, "notation")],
-  });
-}
-
-function buildResourcePanel(resource: ResourceSnapshot): CardElement {
-  const lines = [
-    `CPU ${resource.cpuPercent?.toFixed(0) ?? "-"}% · Load ${resource.loadAverage1m?.toFixed(2) ?? "-"}`,
-    `Memory ${formatBytes(resource.memoryUsedBytes)}/${formatBytes(resource.memoryTotalBytes)} (${resource.memoryPercent.toFixed(0)}%)`,
-    `Uptime ${formatDuration(resource.uptimeSeconds * 1_000)}`,
-  ];
-  if (resource.gpu) {
-    const gpu = resource.gpu;
-    lines.push(
-      `GPU ${gpu.name ?? ""} · ${gpu.utilizationPercent?.toFixed(0) ?? "-"}% · ${gpu.memoryUsedMiB ?? "-"}/${gpu.memoryTotalMiB ?? "-"} MiB · ${gpu.temperatureC ?? "-"}°C`,
-    );
-  }
-  return panel({
-    titleZh: "系统资源",
-    titleEn: "System resources",
-    emoji: "🖥️",
-    expanded: false,
-    elements: [markdown(lines.join("\n"), "notation")],
-  });
+  const stage =
+    running.length > 0
+      ? `执行 ${running.at(-1)}`
+      : session.answer
+        ? "生成回复"
+        : "分析任务";
+  return {
+    tag: "column_set",
+    flex_mode: "none",
+    background_style: "grey",
+    horizontal_spacing: "12px",
+    margin: "0px 0px 4px 0px",
+    columns: [
+      {
+        tag: "column",
+        width: "weighted",
+        weight: 2,
+        vertical_align: "center",
+        elements: [markdown(`**⏳ ${stage}**\n正在持续更新结果`, "notation")],
+      },
+      {
+        tag: "column",
+        width: "weighted",
+        weight: 1,
+        vertical_align: "center",
+        elements: [
+          markdown(
+            `<font color='grey'>步骤</font>\n**${total ? `${settled}/${total}` : "准备中"}**`,
+            "notation",
+          ),
+        ],
+      },
+      {
+        tag: "column",
+        width: "weighted",
+        weight: 1,
+        vertical_align: "center",
+        elements: [
+          markdown(
+            `<font color='grey'>耗时</font>\n**${formatDuration(now - session.startedAt)}**`,
+            "notation",
+          ),
+        ],
+      },
+    ],
+  };
 }
 
 function statusText(status: SessionSnapshot["status"]): string {
@@ -292,66 +356,105 @@ function money(value: number, currency: "CNY" | "USD" | undefined): string {
   return `${symbol}${value.toFixed(value < 0.01 ? 4 : 2)}`;
 }
 
-function buildFooter(params: {
+function buildDetailsPanel(params: {
   session: SessionSnapshot;
   totals: UsageTotals;
   config: CardFooterConfig;
+  resource?: ResourceSnapshot;
   legacy?: LegacyRuntimeSnapshot;
   now: number;
 }): CardElement | undefined {
-  const { session, totals, config, legacy, now } = params;
+  const { session, totals, config, resource, legacy, now } = params;
   const usage = session.usage;
-  const items: string[] = [];
-  if (config.footer.status) {
-    items.push(statusText(session.status));
+  const showFooter = config.panels.footer;
+  const elements: CardElement[] = [];
+  const overview: Array<{ label: string; value: string; weight?: number }> = [];
+  if (showFooter && config.footer.status) {
+    overview.push({ label: "状态", value: statusText(session.status) });
   }
-  if (config.footer.elapsed) {
-    items.push(
-      `耗时 ${formatDuration((session.completedAt ?? now) - session.startedAt)}`,
-    );
+  if (showFooter && config.footer.elapsed) {
+    overview.push({
+      label: "耗时",
+      value: formatDuration((session.completedAt ?? now) - session.startedAt),
+    });
   }
-  if (config.footer.firstToken && session.firstTokenAt) {
-    items.push(
-      `首 Token ${formatDuration(session.firstTokenAt - session.startedAt)}`,
-    );
+  if (showFooter && config.footer.firstToken && session.firstTokenAt) {
+    overview.push({
+      label: "首 Token",
+      value: formatDuration(session.firstTokenAt - session.startedAt),
+    });
   }
   if (
+    showFooter &&
     config.footer.model &&
     (usage?.resolvedRef ?? usage?.model ?? usage?.provider)
   ) {
-    items.push(
-      usage?.resolvedRef ??
+    overview.push({
+      label: "模型",
+      value:
+        usage?.resolvedRef ??
         [usage?.provider, usage?.model].filter(Boolean).join("/"),
-    );
+      weight: 2,
+    });
   }
-  if (config.footer.tokens && usage) {
-    items.push(
-      `↑ ${compactNumber(usage.inputTokens ?? 0)} ↓ ${compactNumber(usage.outputTokens ?? 0)}`,
-    );
+  if (overview.length > 0) {
+    elements.push(...columnRows(overview));
+  }
+
+  const usageItems: Array<{ label: string; value: string; weight?: number }> =
+    [];
+  if (
+    showFooter &&
+    config.footer.tokens &&
+    usage &&
+    (usage.inputTokens !== undefined || usage.outputTokens !== undefined)
+  ) {
+    usageItems.push({
+      label: "本次 Token",
+      value: `↑ ${compactNumber(usage.inputTokens ?? 0)} · ↓ ${compactNumber(usage.outputTokens ?? 0)}`,
+    });
   }
   if (
+    showFooter &&
     config.footer.cache &&
     usage &&
     ((usage.cacheReadTokens ?? 0) > 0 || (usage.cacheWriteTokens ?? 0) > 0)
   ) {
-    items.push(
-      `缓存 ${compactNumber(usage.cacheReadTokens ?? 0)}/${compactNumber(usage.cacheWriteTokens ?? 0)}`,
-    );
+    usageItems.push({
+      label: "缓存 读/写",
+      value: `${compactNumber(usage.cacheReadTokens ?? 0)} / ${compactNumber(usage.cacheWriteTokens ?? 0)}`,
+    });
   }
-  if (config.footer.context && usage?.contextTokenBudget) {
+  if (showFooter && config.footer.context && usage?.contextTokenBudget) {
     const used = usage.contextUsedTokens ?? usage.inputTokens ?? 0;
     const percent = Math.min(
       999,
       Math.round((used / usage.contextTokenBudget) * 100),
     );
-    items.push(
-      `上下文 ${compactNumber(used)}/${compactNumber(usage.contextTokenBudget)} (${percent}%)`,
-    );
+    usageItems.push({
+      label: "上下文",
+      value: `${compactNumber(used)} / ${compactNumber(usage.contextTokenBudget)} · ${percent}%`,
+    });
   }
-  if (config.footer.cost && usage?.turnCost !== undefined) {
-    items.push(`本次 ${money(usage.turnCost, usage.currency)}`);
+  if (
+    showFooter &&
+    config.footer.cost &&
+    usage?.turnCost !== undefined &&
+    usage.turnCost > 0
+  ) {
+    usageItems.push({
+      label: "本次费用",
+      value: money(usage.turnCost, usage.currency),
+    });
   }
-  if (config.footer.totals) {
+  if (usageItems.length > 0) {
+    if (elements.length > 0) {
+      elements.push(divider());
+    }
+    elements.push(...columnRows(usageItems));
+  }
+
+  if (showFooter && config.footer.totals && totals.allTimeTokens > 0) {
     const tokenTotals = [
       ...(config.footer.todayTokens
         ? [`今 ${compactNumber(totals.todayTokens)}`]
@@ -361,7 +464,7 @@ function buildFooter(params: {
         : []),
       `总 ${compactNumber(totals.allTimeTokens)}`,
     ];
-    items.push(`Token ${tokenTotals.join("/")}`);
+    const totalLines = [`**累计用量**  ${tokenTotals.join(" · ")}`];
     if (totals.allTimeCost > 0 && totals.currency) {
       const costTotals = [
         ...(config.footer.todayTokens
@@ -372,14 +475,53 @@ function buildFooter(params: {
           : []),
         `总 ${money(totals.allTimeCost, totals.currency)}`,
       ];
-      items.push(`费用 ${costTotals.join("/")}`);
+      totalLines.push(`**累计费用**  ${costTotals.join(" · ")}`);
+    }
+    if (elements.length > 0) {
+      elements.push(divider());
+    }
+    elements.push(markdown(totalLines.join("\n"), "notation"));
+  }
+
+  if (config.panels.resources && resource) {
+    if (elements.length > 0) {
+      elements.push(divider());
+    }
+    elements.push(markdown("**🖥️ 系统资源**", "notation"));
+    elements.push(
+      columns([
+        {
+          label: "CPU / Load",
+          value: `${resource.cpuPercent?.toFixed(0) ?? "-"}% · ${resource.loadAverage1m?.toFixed(2) ?? "-"}`,
+        },
+        {
+          label: "内存",
+          value: `${formatBytes(resource.memoryUsedBytes)} / ${formatBytes(resource.memoryTotalBytes)} · ${resource.memoryPercent.toFixed(0)}%`,
+          weight: 2,
+        },
+        {
+          label: "系统运行",
+          value: formatDuration(resource.uptimeSeconds * 1_000),
+        },
+      ]),
+    );
+    if (resource.gpu) {
+      const gpu = resource.gpu;
+      elements.push(
+        markdown(
+          `GPU ${gpu.name ?? ""} · ${gpu.utilizationPercent?.toFixed(0) ?? "-"}% · ${gpu.memoryUsedMiB ?? "-"}/${gpu.memoryTotalMiB ?? "-"} MiB · ${gpu.temperatureC ?? "-"}°C`,
+          "notation",
+        ),
+      );
     }
   }
-  if (config.footer.backgroundTasks && legacy) {
+
+  const taskLines: string[] = [];
+  if (showFooter && config.footer.backgroundTasks && legacy) {
     const running = legacy.tasks.filter((task) => task.status === "running");
     const stalled = legacy.tasks.filter((task) => task.status === "stalled");
     if (running.length > 0) {
-      items.push(
+      taskLines.push(
         `后台任务 ${running.length} 个进行中：${running
           .slice(0, 3)
           .map((task) =>
@@ -391,7 +533,7 @@ function buildFooter(params: {
       );
     }
     if (stalled.length > 0) {
-      items.push(
+      taskLines.push(
         `⚠️ ${stalled.length} 个任务停滞：${stalled
           .slice(0, 3)
           .map((task) => task.name)
@@ -399,8 +541,8 @@ function buildFooter(params: {
       );
     }
   }
-  if (config.footer.balance && legacy?.balances.length) {
-    items.push(
+  if (showFooter && config.footer.balance && legacy?.balances.length) {
+    taskLines.push(
       `余额 ${legacy.balances
         .slice(0, 3)
         .map(
@@ -410,15 +552,22 @@ function buildFooter(params: {
         .join(" · ")}`,
     );
   }
-  if (items.length === 0) {
+  if (taskLines.length > 0) {
+    if (elements.length > 0) {
+      elements.push(divider());
+    }
+    elements.push(markdown(taskLines.join("\n"), "notation"));
+  }
+
+  if (elements.length === 0) {
     return undefined;
   }
   return panel({
-    titleZh: "运行统计",
-    titleEn: "Runtime metrics",
-    emoji: "🪙",
+    titleZh: "运行详情",
+    titleEn: "Run details",
+    emoji: "⚙️",
     expanded: false,
-    elements: [markdown(items.join(" · "), "notation")],
+    elements,
   });
 }
 
@@ -429,9 +578,46 @@ function headerTemplate(status: SessionSnapshot["status"]): string {
     case "completed":
       return "green";
     case "failed":
-    case "aborted":
       return "red";
+    case "aborted":
+      return "grey";
   }
+}
+
+function statusTag(status: SessionSnapshot["status"]): {
+  text: string;
+  color: string;
+} {
+  switch (status) {
+    case "running":
+      return { text: "进行中", color: "blue" };
+    case "completed":
+      return { text: "已完成", color: "green" };
+    case "failed":
+      return { text: "执行异常", color: "red" };
+    case "aborted":
+      return { text: "已停止", color: "neutral" };
+  }
+}
+
+function headerSubtitle(session: SessionSnapshot, now: number): string {
+  const elapsed = formatDuration(
+    (session.completedAt ?? now) - session.startedAt,
+  );
+  const runningTool = session.tools.findLast(
+    (step) => step.status === "running",
+  );
+  if (session.status === "running") {
+    return runningTool
+      ? `正在执行 ${runningTool.name} · ${elapsed}`
+      : session.answer
+        ? `正在生成回复 · ${elapsed}`
+        : `正在分析任务 · ${elapsed}`;
+  }
+  if (session.tools.length > 0) {
+    return `${session.tools.length} 个执行步骤 · ${elapsed}`;
+  }
+  return `本次回复 · ${elapsed}`;
 }
 
 export function renderCard(params: {
@@ -446,39 +632,32 @@ export function renderCard(params: {
   const { session, config } = params;
   const elements: CardElement[] = [];
 
-  if (config.panels.resources && params.resource) {
-    elements.push(buildResourcePanel(params.resource));
-  }
-  const toolsPanel = config.panels.tools
-    ? buildToolsPanel(session.tools)
+  const activity = config.panels.progress
+    ? buildActivityStrip(session, now)
     : undefined;
-  if (toolsPanel) {
-    elements.push(toolsPanel);
+  if (activity) {
+    elements.push(activity);
   }
-  if (config.panels.progress) {
-    elements.push(buildProgressPanel(session));
-  }
-  if (config.panels.reasoning && session.reasoning) {
-    elements.push(
-      panel({
-        titleZh: "思考过程",
-        titleEn: "Reasoning",
-        emoji: "💭",
-        expanded: false,
-        elements: [markdown(session.reasoning.slice(-6_000), "notation")],
-      }),
-    );
-  }
+
   if (session.notices.length > 0 && !session.answer) {
-    elements.push(markdown(session.notices.at(-1) ?? "", "notation"));
+    elements.push(
+      markdown(
+        `<font color='grey'>${session.notices.at(-1) ?? ""}</font>`,
+        "notation",
+      ),
+    );
   }
   const answer =
     session.answer ||
     (session.status === "running"
-      ? "正在处理…"
+      ? session.tools.some((step) => step.status === "running")
+        ? "正在执行所需步骤，结果将在这里持续更新…"
+        : "正在理解任务并准备回复…"
       : session.status === "failed"
-        ? "任务执行出错。"
-        : "任务已结束。");
+        ? "本次任务执行异常，请展开执行记录查看详情。"
+        : session.status === "aborted"
+          ? "任务已停止。"
+          : "任务已完成，本次没有生成可显示的文本。");
   elements.push(
     markdown(
       answer.length > MAX_ANSWER_CHARS
@@ -487,16 +666,40 @@ export function renderCard(params: {
     ),
   );
 
-  if (config.panels.footer) {
-    const footer = buildFooter({
+  const toolsPanel = config.panels.tools
+    ? buildToolsPanel(session.tools)
+    : undefined;
+  if (toolsPanel) {
+    elements.push(toolsPanel);
+  }
+  if (
+    config.panels.reasoning &&
+    session.status !== "running" &&
+    session.reasoning &&
+    session.reasoning.trim() !== session.answer.trim()
+  ) {
+    elements.push(
+      panel({
+        titleZh: "分析摘要",
+        titleEn: "Analysis summary",
+        emoji: "🧭",
+        expanded: false,
+        elements: [markdown(session.reasoning.slice(-6_000), "notation")],
+      }),
+    );
+  }
+
+  if (config.panels.footer || config.panels.resources) {
+    const details = buildDetailsPanel({
       session,
       totals: params.totals,
       config,
       now,
+      ...(params.resource ? { resource: params.resource } : {}),
       ...(params.legacy ? { legacy: params.legacy } : {}),
     });
-    if (footer) {
-      elements.push(footer);
+    if (details) {
+      elements.push(details);
     }
   }
 
@@ -510,10 +713,28 @@ export function renderCard(params: {
       : undefined) ??
     config.title ??
     (session.runtime === "openclaw" ? "OpenClaw" : "Hermes");
+  const tag = statusTag(session.status);
+  const headerTags: CardElement[] = [
+    {
+      tag: "text_tag",
+      text: { tag: "plain_text", content: tag.text },
+      color: tag.color,
+    },
+  ];
+  if (session.tools.length > 0) {
+    headerTags.push({
+      tag: "text_tag",
+      text: {
+        tag: "plain_text",
+        content: `${session.tools.length} 步`,
+      },
+      color: "neutral",
+    });
+  }
   return fitCardByteBudget({
     schema: "2.0",
     config: {
-      wide_screen_mode: true,
+      width_mode: "fill",
       update_multi: true,
       streaming_mode: session.status === "running",
       locales: ["zh_cn", "en_us"],
@@ -527,6 +748,7 @@ export function renderCard(params: {
     },
     header: {
       template: headerTemplate(session.status),
+      padding: "12px 16px 12px 16px",
       title: {
         tag: "plain_text",
         content: title,
@@ -537,10 +759,16 @@ export function renderCard(params: {
       },
       subtitle: {
         tag: "plain_text",
-        content: statusText(session.status),
+        content: headerSubtitle(session, now),
       },
+      text_tag_list: headerTags,
     },
-    body: { elements },
+    body: {
+      direction: "vertical",
+      vertical_spacing: "12px",
+      padding: "14px 16px 16px 16px",
+      elements,
+    },
   });
 }
 
