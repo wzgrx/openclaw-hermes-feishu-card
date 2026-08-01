@@ -135,4 +135,73 @@ describe("OpenClaw card bridge delivery policy", () => {
     expect(emptyResult).toBeUndefined();
     expect(flush).not.toHaveBeenCalled();
   });
+
+  it("derives the native Feishu chat id from the canonical session key", () => {
+    const { bridge } = createHarness();
+    bridge.onMessageReceived(
+      {
+        messageId: "om_input",
+        sessionKey: "agent:main:feishu:group:oc_group_fixture",
+        runId: "route-run",
+      },
+      {
+        channelId: "feishu",
+        accountId: "default",
+        sessionKey: "agent:main:feishu:group:oc_group_fixture",
+        runId: "route-run",
+      },
+    );
+
+    expect(bridge.sessions.get("route-run")?.snapshot().route).toMatchObject({
+      conversationId: "oc_group_fixture",
+      replyToId: "om_input",
+    });
+  });
+
+  it("captures ordinary text when channelData only carries core metadata", async () => {
+    const { bridge, flush } = createHarness();
+    const result = await bridge.onReplyPayload(
+      {
+        payload: {
+          text: "done",
+          channelData: {
+            core: { source: "agent" },
+            feishu: { route: "group" },
+          },
+        },
+        kind: "final",
+        channel: "feishu",
+        sessionKey: "agent:main:feishu:group:oc_group_fixture",
+        runId: "metadata-run",
+      },
+      {
+        channelId: "feishu",
+        accountId: "default",
+        sessionKey: "agent:main:feishu:group:oc_group_fixture",
+        runId: "metadata-run",
+      },
+    );
+
+    expect(result).toMatchObject({ cancel: true });
+    expect(flush).toHaveBeenCalledOnce();
+  });
+
+  it("preserves an explicit Feishu-native channel payload", async () => {
+    const { bridge, flush } = createHarness();
+    const result = await bridge.onReplyPayload(
+      {
+        payload: {
+          text: "native",
+          channelData: { feishu: { card: { schema: "2.0" } } },
+        },
+        kind: "final",
+        channel: "feishu",
+        runId: "native-run",
+      },
+      context,
+    );
+
+    expect(result).toBeUndefined();
+    expect(flush).not.toHaveBeenCalled();
+  });
 });

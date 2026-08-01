@@ -11,6 +11,11 @@
   subset supported by the `openclaw-lark` direct dispatcher.
 - Keep plain-text replies eligible for CardKit rendering when OpenClaw attaches
   delivery routing metadata; rich/media payloads still remain native.
+- Recover native Feishu chat targets from canonical OpenClaw session keys when
+  outbound hook contexts omit `conversationId`, so the rich card renderer can
+  reliably replace the built-in minimal card.
+- Treat generic core `channelData` as metadata rather than an automatic native
+  delivery opt-out while preserving explicit Feishu cards and rich payloads.
 
 - Force Gateway startup activation so hook-only CardKit delivery is present in
   the live Feishu inbound/reply pipeline instead of loading only in inspection

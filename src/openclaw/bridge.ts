@@ -33,6 +33,7 @@ interface MessageContext {
   sessionKey?: string;
   runId?: string;
   messageId?: string;
+  replyToId?: string;
 }
 
 interface MessageReceivedEvent {
@@ -79,15 +80,46 @@ function normalizeRoute(
   ctx: MessageContext,
   event?: MessageReceivedEvent,
 ): SessionRoute {
+  const conversationId = resolveConversationId(ctx);
   return {
     channelId: ctx.channelId,
     ...(ctx.accountId ? { accountId: ctx.accountId } : {}),
-    ...(ctx.conversationId ? { conversationId: ctx.conversationId } : {}),
-    ...((event?.messageId ?? ctx.messageId)
-      ? { replyToId: event?.messageId ?? ctx.messageId }
+    ...(conversationId ? { conversationId } : {}),
+    ...((event?.messageId ?? ctx.messageId ?? ctx.replyToId)
+      ? { replyToId: event?.messageId ?? ctx.messageId ?? ctx.replyToId }
       : {}),
     ...(event?.threadId ? { threadId: String(event.threadId) } : {}),
   };
+}
+
+function normalizeConversationTarget(
+  value: string | undefined,
+): string | undefined {
+  const target = value?.trim();
+  if (!target) {
+    return undefined;
+  }
+  return target
+    .replace(/^(?:feishu|openclaw-lark):/i, "")
+    .replace(/^(?:chat|group|user):/i, "");
+}
+
+function conversationIdFromSessionKey(
+  sessionKey: string | undefined,
+): string | undefined {
+  const key = sessionKey?.trim();
+  if (!key) {
+    return undefined;
+  }
+  const match = key.match(/:(?:group|direct|channel):([^:]+)$/i);
+  return normalizeConversationTarget(match?.[1]);
+}
+
+function resolveConversationId(ctx: MessageContext): string | undefined {
+  return (
+    normalizeConversationTarget(ctx.conversationId) ??
+    conversationIdFromSessionKey(ctx.sessionKey)
+  );
 }
 
 function normalizeUsage(
@@ -124,14 +156,32 @@ function normalizeUsage(
   };
 }
 
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function hasNativeChannelPayload(payload: Record<string, unknown>): boolean {
+  const channelData = record(payload.channelData);
+  const feishu = record(channelData.feishu ?? channelData["openclaw-lark"]);
+  return (
+    feishu.card !== undefined ||
+    channelData.execApproval !== undefined ||
+    channelData.location !== undefined ||
+    channelData.message !== undefined
+  );
+}
+
 function needsNativeDelivery(payload: Record<string, unknown>): boolean {
   return (
     typeof payload.mediaUrl === "string" ||
     (Array.isArray(payload.mediaUrls) && payload.mediaUrls.length > 0) ||
     payload.presentation !== undefined ||
     payload.interactive !== undefined ||
-    payload.channelData !== undefined ||
+    hasNativeChannelPayload(payload) ||
     payload.btw !== undefined ||
+    payload.location !== undefined ||
     payload.ttsSupplement !== undefined ||
     payload.isCompactionNotice === true ||
     payload.isFallbackNotice === true ||
@@ -380,7 +430,13 @@ export class OpenClawCardBridge {
   private async flushNow(key: string): Promise<boolean> {
     const session = this.sessions.get(key);
     const snapshot = session?.snapshot();
-    if (!session || !snapshot?.route?.conversationId) {
+    if (!session) {
+      return false;
+    }
+    if (!snapshot?.route?.conversationId) {
+      this.api.logger.warn(
+        `[openclaw-hermes-feishu-card] delivery route missing key=${key} session=${snapshot?.id ?? "unknown"}`,
+      );
       return false;
     }
     const credentials = resolveFeishuCredentials(
