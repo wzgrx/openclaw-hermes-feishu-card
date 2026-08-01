@@ -268,7 +268,8 @@ export class LarkCliCardClient {
       method: "PUT",
       path: `/open-apis/cardkit/v1/cards/${encodeURIComponent(cardId)}/elements/footer/content`,
       data: {
-        content: "已完成 · lark-cli CardKit smoke",
+        content:
+          "已完成 · lark-cli CardKit smoke\n↑ 0 ↓ 0 · 缓存 0/0 (0%) · 上下文 0/0 (0%)",
         sequence: 3,
         uuid: `smoke_footer_${Date.now()}`,
       },

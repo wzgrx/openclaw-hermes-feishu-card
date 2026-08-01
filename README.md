@@ -8,21 +8,30 @@
 - **Hermes Agent**：Python 平台插件，继承 Hermes 原生 `FeishuAdapter`，保留 WebSocket、权限、附件、线程和命令能力，只替换回答的展示层。
 - **lark-cli**：调用官方 `larksuite/cli` 的 raw API 层，提供凭据不进入命令行参数的 CardKit dry-run 和端到端烟雾测试。
 
-它把回答、工具步骤、任务进度、思考摘要和真实运行数据集中在一张流式卡片中；完成态沿用旧项目的单行 Footer，只显示耗时、实际模型、Token 和上下文。Provider、缓存、费用与推理档位继续按真实值采集到内部指标和账本，不挤占主卡片版面。
+默认卡片直接沿用迁移前 WSL 中实际运行的官方 Builder：全程不加 Header；等待态
+显示折叠的“等待工具执行”，执行态展开当前工具，完成态依次显示折叠工具面板、
+折叠思考面板、最终回答和原来的两行 Footer。Footer 保留状态、耗时、实际模型、
+Token、缓存与上下文。Provider、费用、推理档位、资源与累计数据继续按真实值采集
+到内部指标和账本；仅在显式启用对应诊断开关时进入折叠面板。
+
+![迁移前原版卡片视觉契约](docs/assets/classic-card-preview.png)
 
 ## 设计特点
 
 - 不改动用户全局安装的 `@larksuite/openclaw-lark` 或 Hermes；官方飞书通道作为锁定依赖随插件加载，发布格式兼容处理只发生在依赖目录中的私有运行时副本。
 - CardKit 2.0 全量更新，严格递增 `sequence`，结束时关闭流式状态。
 - 投递失败时保留上游原生文本链路。
-- 工具进度与回答共用卡片；媒体、审批、文件、语音继续走原生通道。
-- Provider ID、供应商品牌、请求模型与实际模型在运行数据中分别保存；旧版紧凑
+- 工具进度与回答共用卡片，独立进度条默认关闭；媒体、审批、文件、语音继续走原生通道。
+- Provider ID、供应商品牌、请求模型与实际模型在运行数据中分别保存；旧版两行
   Footer 只显示实际模型，不把路由名或商家名误当模型名。
 - 上下文使用末次模型调用的真实 Prompt 占用，不使用多工具循环的累计输入量；
   仅有累计值时明确标记为估算。
 - OpenClaw 与 Hermes 可写入同一份追加式 `usage.ndjson`。
 - 支持多账户卡片标题、附件摘要、GPU、旧版后台任务和供应商余额缓存；这些可能
   不完整或过期的诊断项默认关闭，并明确标注本地/缓存语义。
+- OpenClaw 原生直派保留迁移前 Builder 本身，路由型 Hook 和 Hermes 复刻同一层级；
+  `tests/fixtures/legacy-card-visual-contract.json` 固定等待、工具、完成和无面板状态，
+  并记录原安装文件的 SHA-256。
 - App Secret 只从现有运行时配置或环境变量读取，日志中不输出凭据。
 - 中文/英文卡片标题与摘要，默认时区为 `Asia/Shanghai`。
 - `doctor --runtime --fix` 可检测并修复集成通道、原生 Footer、重复通道注册和 lark-cli CardKit 路由。
@@ -72,7 +81,7 @@ openclaw plugins enable openclaw-hermes-feishu-card
 openclaw plugins doctor
 ```
 
-将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。设置 `embeddedLark: true` 并禁用独立的 `openclaw-lark` 条目；本插件会注册同一套官方通道能力，同时在通道 controller 终态读取 `llm_output` 的实际 Provider、模型、推理档位、Token、上下文与费用，再把旧版要求的实际模型、Token 和上下文子集映射到紧凑 Footer。媒体和原生交互卡片仍由官方通道逻辑处理。
+将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。设置 `embeddedLark: true` 并禁用独立的 `openclaw-lark` 条目；本插件会注册同一套官方通道能力，同时在通道 controller 终态读取 `llm_output` 的实际 Provider、模型、推理档位、Token、缓存、上下文与费用，再把原 Builder 所需字段原样交回旧版两行 Footer。媒体和原生交互卡片仍由官方通道逻辑处理。
 
 运行时诊断和自动修复：
 

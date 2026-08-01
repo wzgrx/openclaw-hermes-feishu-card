@@ -10,7 +10,7 @@ import {
 import { CardSession } from "../src/core/state.js";
 
 describe("renderCard", () => {
-  it("renders the redesigned hierarchy in CardKit 2.0 format", () => {
+  it("keeps optional diagnostics behind the installed classic hierarchy", () => {
     const session = new CardSession({
       id: "render-1",
       runtime: "openclaw",
@@ -20,7 +20,7 @@ describe("renderCard", () => {
       },
       now: Date.parse("2026-07-30T01:00:00Z"),
     });
-    session.applyReply("block", "<think>Inspecting</think>Answer in progress");
+    session.applyReply("block", "<think>Inspecting</think>");
     session.startTool({
       id: "tool-1",
       name: "shell",
@@ -32,6 +32,7 @@ describe("renderCard", () => {
       output: "passed",
       durationMs: 500,
     });
+    session.applyReply("final", "Answer in progress");
     session.setUsage({
       provider: "deepseek",
       model: "deepseek-v4",
@@ -56,8 +57,6 @@ describe("renderCard", () => {
       session: session.snapshot(),
       config: resolveConfig({
         storageDir: "./tmp-test",
-        title: "Default Bot",
-        accountTitles: { work: "Work Bot" },
         panels: { resources: true },
         footer: {
           totals: true,
@@ -106,28 +105,23 @@ describe("renderCard", () => {
     });
 
     expect(card.schema).toBe("2.0");
-    expect((card.config as Record<string, unknown>).width_mode).toBe("fill");
     const serialized = JSON.stringify(card);
-    expect(serialized).toContain("Work Bot");
     expect(serialized).toContain("主机资源");
-    expect(serialized).toContain("Execution log");
-    expect(serialized).toContain("正在持续更新结果");
+    expect(serialized).toContain("🛠️ 执行耗时 0.5s");
+    expect(serialized).toContain("💭 思考");
     expect(serialized).toContain("Diagnostics");
-    expect(serialized).toContain("模型 DeepSeek · deepseek-v4");
     expect(serialized).toContain("deepseek-v4");
     expect(serialized).toContain("模型路由");
     expect(serialized).toContain("router/auto");
-    expect(serialized).toContain("推理 high");
-    expect(serialized).toContain("本轮 ↑ 1,200 ↓ 300");
-    expect(serialized).toContain("上下文 2,000 / 128,000 (1.6%)");
     expect(serialized).toContain("末次模型调用");
     expect(serialized).toContain("插件本地累计");
     expect(serialized).toContain("后台任务");
-    expect(serialized).toContain("DeepSeek");
     expect(serialized).not.toContain("100%");
-    expect(serialized.indexOf("Answer in progress")).toBeLessThan(
-      serialized.indexOf("Execution log"),
-    );
+    const bodyElements = (
+      card.body as { elements: Array<Record<string, unknown>> }
+    ).elements;
+    expect(bodyElements[0]?.tag).toBe("collapsible_panel");
+    expect(bodyElements[2]?.content).toBe("Answer in progress");
     expect(countCardElements(card)).toBeLessThan(200);
     expect(Buffer.byteLength(JSON.stringify(card), "utf8")).toBeLessThan(
       28_000,
@@ -163,11 +157,69 @@ describe("renderCard", () => {
 
     expect(serialized).toContain("这是最终答案。");
     expect(serialized).toContain("已完成");
+    expect(card).not.toHaveProperty("header");
+    const elements = (card.body as { elements: Array<Record<string, unknown>> })
+      .elements;
+    expect(elements.map((element) => element.tag)).toEqual([
+      "collapsible_panel",
+      "markdown",
+      "markdown",
+    ]);
+    expect(elements[0]).toMatchObject({
+      expanded: false,
+      border: { color: "grey", corner_radius: "5px" },
+    });
+    expect(elements.at(-1)).toMatchObject({
+      tag: "markdown",
+      text_size: "notation",
+    });
     expect(serialized).not.toContain("Diagnostics");
     expect(serialized).not.toContain("Task progress");
     expect(serialized).not.toContain("100%");
     expect(serialized).not.toContain("累计用量");
-    expect(serialized).not.toContain("Execution log");
+    expect(serialized).toContain("未调用工具");
+  });
+
+  it("uses the old no-header streaming card with an expanded active tool panel", () => {
+    const session = new CardSession({
+      id: "running",
+      runtime: "openclaw",
+      now: Date.parse("2026-07-30T01:00:00Z"),
+    });
+    session.startTool({
+      id: "tool",
+      name: "终端",
+      input: "echo ok",
+      now: Date.parse("2026-07-30T01:00:00Z"),
+    });
+    const card = renderCard({
+      session: session.snapshot(),
+      config: resolveConfig({ storageDir: "./tmp-test" }),
+      totals: {
+        todayTokens: 0,
+        monthTokens: 0,
+        allTimeTokens: 0,
+        todayCost: 0,
+        monthCost: 0,
+        allTimeCost: 0,
+      },
+      now: Date.parse("2026-07-30T01:00:02Z"),
+    });
+    expect(card).not.toHaveProperty("header");
+    const elements = (card.body as { elements: Array<Record<string, unknown>> })
+      .elements;
+    expect(
+      elements.map((element) => element.element_id ?? element.tag),
+    ).toEqual(["collapsible_panel", "streaming_content", "loading_icon"]);
+    expect(elements[0]).toMatchObject({
+      expanded: true,
+      border: { color: "grey", corner_radius: "5px" },
+      header: {
+        title: {
+          i18n_content: { zh_cn: "🛠️ 工具执行 · 1 步 · (2.0s)" },
+        },
+      },
+    });
   });
 
   it("enforces the CardKit byte and markdown-table budgets", () => {

@@ -29,7 +29,7 @@
           "panels": {
             "reasoning": true,
             "tools": true,
-            "progress": true,
+            "progress": false,
             "resources": false,
             "footer": true,
           },

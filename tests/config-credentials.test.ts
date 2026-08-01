@@ -15,7 +15,7 @@ describe("configuration", () => {
     expect(config.panels).toEqual({
       reasoning: true,
       tools: true,
-      progress: true,
+      progress: false,
       resources: false,
       footer: true,
     });

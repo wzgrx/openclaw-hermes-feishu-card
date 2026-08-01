@@ -1,7 +1,7 @@
 {
   "id": "openclaw-hermes-feishu-card",
   "name": "OpenClaw Hermes Feishu Card",
-  "description": "One CardKit reply with tool progress, runtime resources, token totals and cost metrics.",
+  "description": "Legacy-compatible CardKit replies with accurate tool, model, token and context data.",
   "version": "2.0.0",
   "activation": {
     "onStartup": true
@@ -110,7 +110,7 @@
         "properties": {
           "reasoning": { "type": "boolean", "default": true },
           "tools": { "type": "boolean", "default": true },
-          "progress": { "type": "boolean", "default": true },
+          "progress": { "type": "boolean", "default": false },
           "resources": { "type": "boolean", "default": false },
           "footer": { "type": "boolean", "default": true }
         }

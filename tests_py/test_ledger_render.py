@@ -78,7 +78,7 @@ def test_render_card_has_cardkit_v2_panels(tmp_path) -> None:
             "card_footer": {
                 "storage_dir": str(tmp_path),
                 "title": "Hermes Bot",
-                "panels": {"resources": True},
+                "panels": {"resources": True, "progress": True},
                 "footer": {
                     "totals": True,
                     "today_tokens": True,
@@ -138,14 +138,64 @@ def test_render_card_has_cardkit_v2_panels(tmp_path) -> None:
     assert card["config"]["streaming_mode"] is True
     assert count_card_elements(card) >= 10
     assert "hello" in str(card)
-    assert "Hermes Bot" in str(card)
-    assert "火山引擎 (volcengine)" in str(card)
-    assert "上下文 2,000 / 128,000 (1.6%)" in str(card)
+    assert "header" not in card
+    assert "🛠️ 工具执行 · 1 步" in str(card)
+    assert "loading_icon" in str(card)
     assert "Diagnostics" in str(card)
     assert "report.pdf" in str(card)
     assert "RTX" in str(card)
     assert "同步知识库" in str(card)
     assert "DeepSeek" in str(card)
+
+
+def test_completed_card_matches_legacy_visual_contract(tmp_path) -> None:
+    config = HermesCardConfig.from_extra({"card_footer": {"storage_dir": str(tmp_path), "title": "Hermes"}})
+    session = CardSession(
+        id="complete",
+        route_key="chat",
+        chat_id="chat",
+        reply_to="om_input",
+        metadata=None,
+        started_at=1_000,
+    )
+    session.set_answer("最终答案")
+    session.usage = UsageSnapshot(
+        model="deepseek-v4",
+        input_tokens=1_200,
+        output_tokens=300,
+        context_used_tokens=2_000,
+        context_token_budget=128_000,
+        duration_ms=61_000,
+    )
+    session.upsert_tool(
+        tool_id="search",
+        name="搜索",
+        status="completed",
+        output_preview="完成",
+        duration_ms=2_000,
+    )
+    session.finish()
+
+    card = render_card(session, UsageTotals(), config, now=session.updated_at)
+    assert "header" not in card
+    elements = card["body"]["elements"]
+    assert [element["tag"] for element in elements] == [
+        "collapsible_panel",
+        "markdown",
+        "markdown",
+    ]
+    assert elements[0]["expanded"] is False
+    assert elements[0]["border"] == {"color": "grey", "corner_radius": "5px"}
+    assert elements[0]["header"]["title"]["i18n_content"]["zh_cn"] == "🛠️ 执行耗时 2.0s"
+    assert elements[-1] == {
+        "tag": "markdown",
+        "content": "Completed · Elapsed 1m 1s · deepseek-v4\n↑ 1.2k ↓ 300 · Cache 0/0 (0%) · Context 2.0k/128k (2%)",
+        "text_size": "notation",
+        "i18n_content": {
+            "zh_cn": "已完成 · 耗时 1m 1s · deepseek-v4\n↑ 1.2k ↓ 300 · 缓存 0/0 (0%) · 上下文 2.0k/128k (2%)",
+            "en_us": "Completed · Elapsed 1m 1s · deepseek-v4\n↑ 1.2k ↓ 300 · Cache 0/0 (0%) · Context 2.0k/128k (2%)",
+        },
+    }
 
 
 def test_render_card_enforces_size_and_table_limits(tmp_path) -> None:

@@ -89,7 +89,7 @@ FEISHU_DOMAIN=feishu
 panels:
   reasoning: true
   tools: true
-  progress: true
+  progress: false
   resources: false
   footer: true
 ```
@@ -113,9 +113,10 @@ footer:
   balance: false
 ```
 
-模型、Token、上下文和本轮费用默认直接显示在回答底部；主机资源、本地累计、后台
-任务和余额缓存属于诊断数据，默认隐藏，启用后收进折叠的“诊断信息”面板。插件本地
-累计只代表插件成功捕获的回复，不代表供应商账户总量。
+旧版两行 Footer 显示状态、耗时、实际模型，以及输入/输出 Token、缓存和上下文。
+`first_token`、`cost` 等旧配置键继续解析并参与内部运行指标/账本兼容，不扩展默认 Footer。
+主机资源、本地累计、后台任务和余额缓存属于诊断数据，默认隐藏，启用后收进折叠的
+“诊断信息”面板。插件本地累计只代表插件成功捕获的回复，不代表供应商账户总量。
 
 OpenClaw 使用对应驼峰字段。后台任务读取 `/tmp/openclaw-tasks/*.json`，
 余额读取 `balance-cache.json`；读取器限制文件数和单文件大小，异常数据会被忽略。

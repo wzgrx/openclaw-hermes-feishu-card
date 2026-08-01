@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,10 +9,9 @@ import { describe, expect, it } from "vitest";
 import { resolveConfig } from "../src/core/config.js";
 import {
   createOfficialPluginApi,
-  enrichNativeLarkCard,
+  NativeLarkIntegration,
   NativeLarkMetricsRegistry,
   patchNativeLarkModules,
-  NativeLarkIntegration,
 } from "../src/openclaw/native-lark.js";
 
 describe("native @larksuite/openclaw-lark integration", () => {
@@ -89,220 +90,7 @@ describe("native @larksuite/openclaw-lark integration", () => {
     });
   });
 
-  it("restores the legacy answer-first card, timeline, and compact footer", () => {
-    const card = enrichNativeLarkCard({
-      card: {
-        config: { wide_screen_mode: true },
-        elements: [
-          { tag: "collapsible_panel", elements: [], expanded: false },
-          { tag: "markdown", content: "最终答案" },
-        ],
-      },
-      data: {
-        elapsedMs: 28_800,
-        toolUseSteps: [{ name: "system" }],
-        footerMetrics: {
-          provider: "volcengine",
-          model: "doubao-seed-2-1-turbo-260628",
-          reasoningEffort: "medium",
-          reasoningEffortDefault: true,
-          firstTokenMs: 5_420,
-          inputTokens: 57_370,
-          outputTokens: 22,
-          contextUsedTokens: 57_370,
-          contextTokens: 256_000,
-          turnCostUsd: 0.0254,
-        },
-      },
-      config: resolveConfig({}),
-    });
-
-    expect(card).not.toHaveProperty("header");
-    const elements = card.elements as Array<Record<string, unknown>>;
-    expect(elements).toHaveLength(4);
-    expect(elements[0]?.content).toBe("最终答案");
-    expect(elements[1]).toMatchObject({
-      tag: "collapsible_panel",
-      element_id: "auxiliary_timeline",
-      expanded: false,
-      header: {
-        title: {
-          tag: "plain_text",
-          content: "思考与工具 · 1 次工具调用",
-        },
-        vertical_align: "center",
-      },
-      border: { color: "grey", corner_radius: "8px" },
-      padding: "8px 8px 8px 8px",
-    });
-    expect(elements[2]).toEqual({ tag: "hr", element_id: "main_divider" });
-    expect(elements[3]).toEqual({
-      tag: "markdown",
-      element_id: "footer",
-      content:
-        "已完成 · 29s · doubao-seed-2-1-turbo-260628 · ↑57.4k · ↓22 · ctx 57.4k/256k 22%",
-      text_size: "x-small",
-    });
-  });
-
-  it("keeps the legacy visual contract across thinking and tool-running states", () => {
-    const pendingPanel = {
-      tag: "collapsible_panel",
-      expanded: true,
-      elements: [],
-    };
-    const streamingElement = {
-      tag: "markdown",
-      element_id: "streaming_content",
-      content: "",
-    };
-    const loadingElement = {
-      tag: "markdown",
-      element_id: "loading_icon",
-      content: " ",
-    };
-    const builder = {
-      buildCardContent: (_state: string, data?: Record<string, unknown>) => ({
-        config: { wide_screen_mode: true },
-        elements: [
-          pendingPanel,
-          { tag: "markdown", content: data?.text ?? "" },
-        ],
-      }),
-      buildStreamingThinkingCard: (showToolUse?: boolean) => {
-        void showToolUse;
-        return {
-          schema: "2.0",
-          config: { streaming_mode: true },
-          body: {
-            elements: [pendingPanel, streamingElement, loadingElement],
-          },
-        };
-      },
-      buildStreamingPreAnswerCard: (params: {
-        steps?: unknown[] | undefined;
-        elapsedMs?: number | undefined;
-        showToolUse?: boolean | undefined;
-      }) => ({
-        schema: "2.0",
-        config: { streaming_mode: true },
-        body: {
-          elements: [
-            {
-              ...pendingPanel,
-              elements: params.steps?.map(() => ({
-                tag: "markdown",
-                content: "执行步骤",
-              })),
-            },
-            streamingElement,
-            loadingElement,
-          ],
-        },
-      }),
-    };
-    class Controller {
-      getFooterSessionMetrics(): Promise<unknown> {
-        return Promise.resolve(undefined);
-      }
-    }
-    patchNativeLarkModules({
-      builder,
-      controller: { StreamingCardController: Controller },
-      registry: new NativeLarkMetricsRegistry(),
-      config: resolveConfig({ title: "OpenClaw" }),
-    });
-
-    const thinking = builder.buildStreamingThinkingCard(true) as unknown as {
-      header: Record<string, unknown>;
-      body: { elements: Array<Record<string, unknown>> };
-    };
-    expect(thinking.header).toEqual({
-      template: "indigo",
-      title: { tag: "plain_text", content: "OpenClaw" },
-    });
-    const thinkingElements = thinking.body.elements;
-    expect(thinkingElements.map((element) => element.element_id)).toEqual([
-      "streaming_content",
-      "auxiliary_timeline",
-      "main_divider",
-      "footer",
-    ]);
-    expect(thinkingElements[1]).toMatchObject({
-      expanded: false,
-      header: {
-        title: { content: "思考与工具 · 0 次工具调用" },
-      },
-      elements: [
-        {
-          content: '<font color="grey">等待工具事件…</font>',
-          text_size: "x-small",
-        },
-      ],
-    });
-    expect(thinkingElements.at(-1)).toMatchObject({
-      content: "⠋ 生成中",
-      text_size: "x-small",
-    });
-
-    const running = builder.buildStreamingPreAnswerCard({
-      steps: [{ title: "终端", status: "running" }],
-    }) as unknown as {
-      header: Record<string, unknown>;
-      body: { elements: Array<Record<string, unknown>> };
-    };
-    expect(running.header).toMatchObject({
-      template: "blue",
-      subtitle: { content: "正在执行：终端" },
-    });
-    const runningElements = running.body.elements;
-    expect(runningElements[1]).toMatchObject({
-      element_id: "auxiliary_timeline",
-      expanded: false,
-      header: {
-        title: { content: "思考与工具 · 1 次工具调用" },
-      },
-      elements: [{ content: "执行步骤" }],
-    });
-
-    const fallback = builder.buildCardContent("streaming", {
-      text: "流式回答",
-      toolUseSteps: [{ title: "浏览器" }],
-    }) as Record<string, unknown>;
-    expect(fallback.header).toMatchObject({
-      template: "blue",
-      subtitle: { content: "正在执行：浏览器" },
-    });
-    expect(
-      (fallback.elements as Array<Record<string, unknown>>)[0]?.content,
-    ).toBe("流式回答");
-  });
-
-  it("preserves the legacy stopped-state header and footer", () => {
-    const failed = enrichNativeLarkCard({
-      card: { elements: [{ tag: "markdown", content: "执行失败" }] },
-      data: { isError: true },
-      config: resolveConfig({ title: "OpenClaw" }),
-    });
-    expect(failed.header).toEqual({
-      template: "red",
-      title: { tag: "plain_text", content: "OpenClaw" },
-    });
-    const failedElements = failed.elements as Array<Record<string, unknown>>;
-    expect(failedElements.at(-1)).toMatchObject({
-      content: "已停止",
-      text_size: "x-small",
-    });
-
-    const aborted = enrichNativeLarkCard({
-      card: { elements: [{ tag: "markdown", content: "任务终止" }] },
-      data: { isAborted: true },
-      config: resolveConfig({ title: "OpenClaw" }),
-    });
-    expect(aborted.header).toMatchObject({ template: "grey" });
-  });
-
-  it("patches the channel-owned controller without duplicating its native footer", async () => {
+  it("changes only the channel metric source and leaves builder data untouched", async () => {
     const registry = new NativeLarkMetricsRegistry();
     const ctx = {
       sessionKey: "agent:main:feishu:group:oc_patch",
@@ -319,27 +107,20 @@ describe("native @larksuite/openclaw-lark integration", () => {
       ctx,
     );
     let originalData: Record<string, unknown> | undefined;
-    const builder = {
-      buildCardContent: (_state: string, data?: Record<string, unknown>) => {
-        originalData = data;
-        return { elements: [{ tag: "markdown", content: "answer" }] };
-      },
-      toCardKit2: (card: Record<string, unknown>) => ({
-        schema: "2.0",
-        config: {},
-        body: { elements: card.elements },
-      }),
+    const originalBuild = (_state: string, data?: Record<string, unknown>) => {
+      originalData = data;
+      return { elements: [{ tag: "markdown", content: "answer" }] };
     };
+    const builder = { buildCardContent: originalBuild };
     class Controller {
       deps = { sessionKey: ctx.sessionKey, accountId: "default" };
       getFooterSessionMetrics(): Promise<unknown> {
         return Promise.resolve({ model: "stale-store-model" });
       }
     }
-    const controller = { StreamingCardController: Controller };
     patchNativeLarkModules({
       builder,
-      controller,
+      controller: { StreamingCardController: Controller },
       registry,
       config: resolveConfig({}),
     });
@@ -356,42 +137,27 @@ describe("native @larksuite/openclaw-lark integration", () => {
       contextTokens: 10_000,
       accountId: "default",
     });
-    const card = builder.buildCardContent("complete", {
+
+    const data = {
       elapsedMs: 1_500,
       footer: { status: true, model: true },
       footerMetrics: metrics,
-    }) as { elements: Array<Record<string, unknown>> };
-    expect(originalData?.footer).toMatchObject({
-      status: false,
-      model: false,
+    };
+    expect(builder.buildCardContent).toBe(originalBuild);
+    expect(builder.buildCardContent("complete", data)).toEqual({
+      elements: [{ tag: "markdown", content: "answer" }],
     });
-    expect(card.elements).toHaveLength(4);
-    expect(card.elements[1]).toMatchObject({
-      tag: "markdown",
-      element_id: "tool_summary",
-      content: "工具调用 0 次",
-    });
-    expect(card.elements.at(-1)).toMatchObject({
-      content:
-        '已完成 · 2s · <font color="blue">gpt-test</font> · ↑1k · ↓50 · ctx 1k/10k 10%',
-      text_size: "x-small",
-    });
-    const cardKit = builder.toCardKit2(card);
-    expect(cardKit).toMatchObject({
-      config: {},
-      body: { elements: card.elements },
-    });
+    expect(originalData).toBe(data);
   });
 
-  it("patches the pinned official channel builders with the same golden contract", () => {
+  it("matches the exact visual contract from the pre-migration installed builder", () => {
     const require = createRequire(import.meta.url);
     const entry = fileURLToPath(
       import.meta.resolve("@larksuite/openclaw-lark"),
     );
     const root = path.dirname(path.dirname(entry));
-    const builder = require(
-      path.join(root, "src", "card", "builder.js"),
-    ) as unknown as {
+    const builderPath = path.join(root, "src", "card", "builder.js");
+    const builder = require(builderPath) as unknown as {
       buildCardContent: (
         state: string,
         data?: Record<string, unknown>,
@@ -406,6 +172,9 @@ describe("native @larksuite/openclaw-lark integration", () => {
       }) => Record<string, unknown>;
       toCardKit2: (card: Record<string, unknown>) => Record<string, unknown>;
     };
+    const originalBuild = builder.buildCardContent;
+    const originalThinking = builder.buildStreamingThinkingCard;
+    const originalPreAnswer = builder.buildStreamingPreAnswerCard;
     class Controller {
       getFooterSessionMetrics(): Promise<unknown> {
         return Promise.resolve(undefined);
@@ -415,8 +184,12 @@ describe("native @larksuite/openclaw-lark integration", () => {
       builder,
       controller: { StreamingCardController: Controller },
       registry: new NativeLarkMetricsRegistry(),
-      config: resolveConfig({ title: "OpenClaw" }),
+      config: resolveConfig({}),
     });
+
+    expect(builder.buildCardContent).toBe(originalBuild);
+    expect(builder.buildStreamingThinkingCard).toBe(originalThinking);
+    expect(builder.buildStreamingPreAnswerCard).toBe(originalPreAnswer);
 
     const step = {
       title: "终端",
@@ -424,60 +197,83 @@ describe("native @larksuite/openclaw-lark integration", () => {
       iconToken: "terminal_outlined",
       status: "success",
     };
-    const complete = builder.buildCardContent("complete", {
-      text: "官方通道最终答案",
-      elapsedMs: 61_000,
-      showToolUse: true,
-      toolUseSteps: [step],
-      footerMetrics: {
-        model: "gpt-5.4-mini",
-        inputTokens: 86_000,
-        outputTokens: 303,
-        contextUsedTokens: 86_000,
-        contextTokens: 272_000,
-      },
-    });
-    expect(complete).not.toHaveProperty("header");
-    const completeElements = complete.elements as Array<
-      Record<string, unknown>
-    >;
-    expect(completeElements.map((element) => element.element_id)).toEqual([
-      undefined,
-      "auxiliary_timeline",
-      "main_divider",
-      "footer",
-    ]);
-    expect(completeElements[1]).toMatchObject({
-      header: {
-        title: { content: "思考与工具 · 1 次工具调用" },
-      },
-    });
-    expect(completeElements.at(-1)?.content).toBe(
-      '已完成 · 1m1s · <font color="blue">gpt-5.4-mini</font> · ↑86k · ↓303 · ctx 86k/272k 32%',
+    const footer = {
+      status: true,
+      elapsed: true,
+      model: true,
+      tokens: true,
+      cache: true,
+      context: true,
+    };
+    const complete = builder.toCardKit2(
+      builder.buildCardContent("complete", {
+        text: "官方通道最终答案",
+        elapsedMs: 61_000,
+        reasoningText: "先分析再执行",
+        reasoningElapsedMs: 2_500,
+        showToolUse: true,
+        toolUseSteps: [step],
+        toolUseElapsedMs: 2_000,
+        footer,
+        footerMetrics: {
+          model: "gpt-5.4-mini",
+          inputTokens: 86_000,
+          outputTokens: 303,
+          cacheRead: 20_000,
+          cacheWrite: 1_000,
+          totalTokens: 86_000,
+          totalTokensFresh: true,
+          contextTokens: 272_000,
+        },
+      }),
     );
-    const completeCardKit = builder.toCardKit2(complete);
-    expect(completeCardKit).not.toHaveProperty("header");
-    expect(completeCardKit).toMatchObject({
-      schema: "2.0",
-      body: { elements: completeElements },
-    });
-
     const running = builder.buildStreamingPreAnswerCard({
       steps: [step],
       elapsedMs: 2_000,
       showToolUse: true,
     });
-    expect(running.header).toMatchObject({
-      template: "blue",
-      subtitle: { content: "正在执行：终端" },
-    });
-    const runningBody = running.body as { elements: unknown[] };
-    expect(recordElement(runningBody.elements[1])).toMatchObject({
-      element_id: "auxiliary_timeline",
-      header: {
-        title: { content: "思考与工具 · 1 次工具调用" },
-      },
-    });
+    const thinking = builder.buildStreamingThinkingCard(true);
+    const withoutPanels = builder.toCardKit2(
+      builder.buildCardContent("complete", {
+        text: "无工具答案",
+        elapsedMs: 1_000,
+        showToolUse: false,
+        toolUseSteps: [],
+        footer,
+        footerMetrics: {
+          model: "gpt-5.4-mini",
+          inputTokens: 10,
+          outputTokens: 2,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 10,
+          totalTokensFresh: true,
+          contextTokens: 1_000,
+        },
+      }),
+    );
+
+    const fixturePath = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "fixtures",
+      "legacy-card-visual-contract.json",
+    );
+    const contract = JSON.parse(readFileSync(fixturePath, "utf8")) as {
+      source: { sha256: string };
+      thinking: unknown;
+      toolRunning: unknown;
+      completed: unknown;
+      completedWithoutPanels: unknown;
+    };
+    expect(
+      createHash("sha256").update(readFileSync(builderPath)).digest("hex"),
+    ).toBe(contract.source.sha256);
+    expect(projectVisualContract(thinking)).toEqual(contract.thinking);
+    expect(projectVisualContract(running)).toEqual(contract.toolRunning);
+    expect(projectVisualContract(complete)).toEqual(contract.completed);
+    expect(projectVisualContract(withoutPanels)).toEqual(
+      contract.completedWithoutPanels,
+    );
   });
 
   it("captures the first model response byte for the run summary", () => {
@@ -505,4 +301,58 @@ function recordElement(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function localizedContent(value: unknown): string | undefined {
+  const element = recordElement(value);
+  const i18n = recordElement(element.i18n_content);
+  const content = i18n.zh_cn ?? element.content;
+  return typeof content === "string" ? content : undefined;
+}
+
+function elementRole(element: Record<string, unknown>): string {
+  if (element.element_id === "streaming_content") return "streaming";
+  if (element.element_id === "loading_icon") return "loading";
+  if (element.tag === "collapsible_panel") {
+    const title = recordElement(recordElement(element.header).title);
+    return localizedContent(title)?.startsWith("🛠️") ? "tools" : "reasoning";
+  }
+  if (element.text_size === "notation" && element.i18n_content) return "footer";
+  return "answer";
+}
+
+function projectVisualContract(card: Record<string, unknown>): unknown {
+  const body = recordElement(card.body);
+  const elements = (Array.isArray(body.elements) ? body.elements : []).map(
+    recordElement,
+  );
+  const tools = elements.find((element) => elementRole(element) === "tools");
+  const reasoning = elements.find(
+    (element) => elementRole(element) === "reasoning",
+  );
+  const answer = elements.find((element) => elementRole(element) === "answer");
+  const footer = elements.find((element) => elementRole(element) === "footer");
+  return {
+    hasHeader: Object.keys(recordElement(card.header)).length > 0,
+    elementRoles: elements.map(elementRole),
+    ...(tools
+      ? {
+          toolsExpanded: tools.expanded,
+          toolsTitle: localizedContent(
+            recordElement(recordElement(tools.header).title),
+          ),
+          toolsBorder: recordElement(tools.border),
+        }
+      : {}),
+    ...(reasoning
+      ? {
+          reasoningExpanded: reasoning.expanded,
+          reasoningTitle: localizedContent(
+            recordElement(recordElement(reasoning.header).title),
+          ),
+        }
+      : {}),
+    ...(answer ? { answer: localizedContent(answer) } : {}),
+    ...(footer ? { footer: localizedContent(footer) } : {}),
+  };
 }

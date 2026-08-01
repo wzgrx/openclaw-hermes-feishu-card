@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="860" viewBox="0 0 1280 860">
+  <rect width="1280" height="860" fill="#f5f6f8"/>
+  <style>
+    .ui { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; fill: #1f2329; }
+    .muted { fill: #646a73; }
+    .tiny { font-size: 15px; }
+    .small { font-size: 17px; }
+    .normal { font-size: 20px; }
+    .title { font-size: 26px; font-weight: 650; }
+    .panel-title { font-size: 18px; font-weight: 600; }
+  </style>
+
+  <text x="50" y="45" class="ui title">执行中 · 迁移前原版（无 Header）</text>
+  <text x="660" y="45" class="ui title">完成态 · 迁移前原版（无 Header）</text>
+
+  <rect x="40" y="70" width="570" height="720" rx="12" fill="#ffffff" stroke="#e1e3e8"/>
+  <rect x="60" y="100" width="530" height="245" rx="5" fill="#ffffff" stroke="#c9cdd4"/>
+  <text x="82" y="137" class="ui panel-title">🛠️ 工具执行 · 1 步 · (2.0s)</text>
+  <text x="552" y="137" class="ui normal muted">⌃</text>
+  <line x1="60" y1="158" x2="590" y2="158" stroke="#e5e6eb"/>
+  <circle cx="88" cy="196" r="12" fill="#f2f3f5"/>
+  <text x="82" y="202" class="ui small muted">⌘</text>
+  <text x="113" y="201" class="ui normal" font-weight="600">终端</text>
+  <text x="172" y="201" class="ui normal muted">·</text>
+  <text x="192" y="201" class="ui normal" fill="#00a870">Running</text>
+  <text x="113" y="238" class="ui small muted">echo pnpm check</text>
+  <rect x="112" y="258" width="448" height="60" rx="5" fill="#f7f8fa"/>
+  <text x="128" y="284" class="ui tiny muted">Result</text>
+  <text x="128" y="306" class="ui tiny">正在执行完整测试…</text>
+  <text x="70" y="405" class="ui normal">结果将在这里流式出现…</text>
+  <text x="70" y="465" class="ui normal muted">◌</text>
+  <text x="70" y="745" class="ui tiny muted">等待态面板折叠；工具开始后面板自动展开</text>
+
+  <rect x="650" y="70" width="590" height="720" rx="12" fill="#ffffff" stroke="#e1e3e8"/>
+  <rect x="670" y="100" width="550" height="70" rx="5" fill="#ffffff" stroke="#c9cdd4"/>
+  <text x="692" y="143" class="ui panel-title">🛠️ 执行耗时 2.0s</text>
+  <text x="1180" y="143" class="ui normal muted">⌄</text>
+  <rect x="670" y="190" width="550" height="70" rx="5" fill="#ffffff" stroke="#c9cdd4"/>
+  <text x="692" y="233" class="ui panel-title">💭 思考了 2.5s</text>
+  <text x="1180" y="233" class="ui normal muted">⌄</text>
+
+  <text x="680" y="320" class="ui title">测试完成</text>
+  <text x="680" y="365" class="ui normal">已恢复迁移前实际运行的卡片结构：</text>
+  <text x="700" y="408" class="ui normal">• 工具与思考分别折叠</text>
+  <text x="700" y="446" class="ui normal">• 最终回答位于面板之后</text>
+  <text x="700" y="484" class="ui normal">• 无品牌 Header、无仪表盘</text>
+
+  <line x1="680" y1="585" x2="1200" y2="585" stroke="#e5e6eb"/>
+  <text x="680" y="625" class="ui small muted">已完成 · 耗时 1m 1s · gpt-5.4-mini</text>
+  <text x="680" y="657" class="ui small muted">↑ 86.0k ↓ 303 · 缓存 20.0k/1.0k (19%) · 上下文 86.0k/272k (32%)</text>
+  <text x="680" y="745" class="ui tiny muted">真实模型 / Token / 缓存 / 末次 Prompt 上下文</text>
+
+  <text x="40" y="830" class="ui tiny muted">Golden contract: @larksuite/openclaw-lark 2026.7.16 · pre-migration builder SHA-256 c9440607…6553f</text>
+</svg>

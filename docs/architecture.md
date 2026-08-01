@@ -21,12 +21,15 @@ flowchart LR
 2. 官方 controller 继续负责 WebSocket 入站、流式卡片创建、工具/思考面板、线程回复、媒体和终态关闭。
 3. `llm_output` 按 `sessionKey + runId` 累加每次模型调用，并保留末次调用的真实上下文占用；`agent_end` 补充整轮耗时。
 4. controller 读取内存中的本轮快照，不再依赖旧版 `sessions.json` 文件位置。
-5. 终态 builder 保留官方工具、思考和回答布局，增加品牌 Header，并输出紧凑三行 Footer。
+5. 插件不重排或包装官方 Builder：迁移前与现在锁定的 `2026.7.16` 源文件哈希
+   相同。等待/执行/完成元素顺序、5px 面板、无 Header 和两行 Footer 均由原
+   Builder 直接生成；插件只替换 controller 的运行指标来源。
 6. `reply_payload_sending` 继续处理非通道直派、重定向等普通文本路径；CardKit 成功后才取消原负载。
 
 普通 `text` 以及只含 `text/context/divider` 的通用 `presentation` 可进入路由型
-CardKit bridge；带按钮、选择器、置顶请求、媒体或显式飞书卡片的负载继续交给
-官方通道，避免破坏交互语义。飞书群聊的正常入站回答走上面的集成 controller。
+CardKit bridge；该路径复刻集成 controller 的旧版层级。带按钮、选择器、置顶
+请求、媒体或显式飞书卡片的负载继续交给官方通道，避免破坏交互语义。飞书群聊的
+正常入站回答走上面的集成 controller。
 
 ## Hermes 路径
 

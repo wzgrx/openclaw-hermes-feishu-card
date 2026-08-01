@@ -14,7 +14,7 @@ const plugin: OpenClawPluginDefinition = {
   id: "openclaw-hermes-feishu-card",
   name: "OpenClaw Hermes Feishu Card",
   description:
-    "Feishu CardKit streaming cards with tool progress, resource usage and token totals",
+    "Legacy-compatible Feishu CardKit streaming cards with accurate runtime metrics",
   configSchema: buildJsonPluginConfigSchema(manifest.configSchema),
   register(api: OpenClawPluginApi): void {
     const config = resolveConfig(api.pluginConfig);

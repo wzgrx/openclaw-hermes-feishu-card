@@ -6,13 +6,15 @@ A hybrid repository with two native integrations and one official CLI verificati
 - A Python Hermes platform plugin extending Hermes' native `FeishuAdapter`.
 - A `larksuite/cli` raw-API adapter for structured CardKit dry-runs and live lifecycle smoke tests.
 
-Both render answer text, tool progress, runtime metrics, token usage and configured cost estimates in one CardKit 2.0 message. Media, files, voice, approvals, commands and inbound transport remain owned by the upstream Feishu channel adapters.
+The default card preserves the exact official builder that was running in WSL before migration. It has no added header: the waiting tool panel is collapsed, the active tool panel expands, and a completed reply renders the collapsed tool panel, collapsed reasoning panel, final answer, then the original two-line footer. The footer shows status, elapsed time, actual model, tokens, cache, and context. Provider, cost, reasoning mode, resource, and aggregate metrics remain available internally and only enter diagnostics when explicitly enabled.
 
-The always-visible compact footer shows the provider brand and ID, actual model,
-turn tokens, final-call prompt occupancy and turn cost. Requested versus resolved
-routing appears only when they differ. Host resources, local ledger totals and
-cached balances are opt-in diagnostics so incomplete data is not presented as an
-authoritative provider account total.
+The always-visible two-line footer shows status, elapsed time, the actual model,
+turn tokens, cache usage, and final-call prompt occupancy. Requested-versus-resolved
+routing, cost, and reasoning metadata stay in runtime metrics. Host resources,
+local ledger totals, background tasks, and cached balances are opt-in diagnostics
+so incomplete data is not presented as an authoritative provider account total.
+
+![Pre-migration classic card visual contract](docs/assets/classic-card-preview.png)
 
 ## Quick start
 

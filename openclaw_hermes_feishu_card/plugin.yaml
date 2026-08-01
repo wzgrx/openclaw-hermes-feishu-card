@@ -4,8 +4,8 @@ kind: platform
 version: 2.0.0
 description: >
   Feishu CardKit 2.0 streaming presentation for Hermes Agent. Extends Hermes'
-  native Feishu transport with unified answer, tool progress, resource and
-  token/cost panels.
+  native Feishu transport with the pre-migration no-header tool/reasoning
+  panels, two-line runtime footer and optional diagnostics.
 author: wzgrx
 pip_dependencies:
   - "lark-oapi>=1.6.8,<2"

@@ -18,14 +18,14 @@ const panelsSchema = z
   .object({
     reasoning: z.boolean().default(true),
     tools: z.boolean().default(true),
-    progress: z.boolean().default(true),
+    progress: z.boolean().default(false),
     resources: z.boolean().default(false),
     footer: z.boolean().default(true),
   })
   .default({
     reasoning: true,
     tools: true,
-    progress: true,
+    progress: false,
     resources: false,
     footer: true,
   });

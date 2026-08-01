@@ -51,7 +51,7 @@ class PricingRule:
 class Panels:
     reasoning: bool = True
     tools: bool = True
-    progress: bool = True
+    progress: bool = False
     resources: bool = False
     footer: bool = True
 
@@ -163,7 +163,7 @@ class HermesCardConfig:
             panels=Panels(
                 reasoning=_bool(panel_raw.get("reasoning"), True),
                 tools=_bool(panel_raw.get("tools"), True),
-                progress=_bool(panel_raw.get("progress"), True),
+                progress=_bool(panel_raw.get("progress"), False),
                 resources=_bool(panel_raw.get("resources"), False),
                 footer=_bool(panel_raw.get("footer"), True),
             ),

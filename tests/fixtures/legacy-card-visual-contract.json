@@ -1,0 +1,39 @@
+{
+  "source": {
+    "kind": "pre-migration installed OpenClaw builder",
+    "path": "migration-backups/card-footer-20260731-163346/legacy-extensions/openclaw-lark/src/card/builder.js",
+    "package": "@larksuite/openclaw-lark@2026.7.16",
+    "sha256": "c944060764c2651aacde63db7aef3fd62891767e35367ddfd9b9607670e6553f"
+  },
+  "thinking": {
+    "hasHeader": false,
+    "elementRoles": ["tools", "streaming", "loading"],
+    "toolsExpanded": false,
+    "toolsTitle": "🛠️ 等待工具执行",
+    "toolsBorder": { "color": "grey", "corner_radius": "5px" }
+  },
+  "toolRunning": {
+    "hasHeader": false,
+    "elementRoles": ["tools", "streaming", "loading"],
+    "toolsExpanded": true,
+    "toolsTitle": "🛠️ 工具执行 · 1 步 · (2.0s)",
+    "toolsBorder": { "color": "grey", "corner_radius": "5px" }
+  },
+  "completed": {
+    "hasHeader": false,
+    "elementRoles": ["tools", "reasoning", "answer", "footer"],
+    "toolsExpanded": false,
+    "toolsTitle": "🛠️ 执行耗时 2.0s",
+    "toolsBorder": { "color": "grey", "corner_radius": "5px" },
+    "reasoningExpanded": false,
+    "reasoningTitle": "💭 思考了 2.5s",
+    "answer": "官方通道最终答案",
+    "footer": "已完成 · 耗时 1m 1s · gpt-5.4-mini\n↑ 86.0k ↓ 303 · 缓存 20.0k/1.0k (19%) · 上下文 86.0k/272k (32%)"
+  },
+  "completedWithoutPanels": {
+    "hasHeader": false,
+    "elementRoles": ["answer", "footer"],
+    "answer": "无工具答案",
+    "footer": "已完成 · 耗时 1.0s · gpt-5.4-mini\n↑ 10 ↓ 2 · 缓存 0/0 (0%) · 上下文 10/1.0k (1%)"
+  }
+}

@@ -109,44 +109,49 @@ function buildCard(title) {
         print_step: { default: 2 },
       },
     },
-    header: {
-      title: { tag: "plain_text", content: title },
-      template: "blue",
-    },
     body: {
       elements: [
         {
-          tag: "markdown",
-          content: "正在验证 lark-cli、消息发送和 CardKit 更新链路…",
-          element_id: "content",
-        },
-        {
           tag: "collapsible_panel",
-          element_id: "auxiliary_timeline",
           expanded: false,
           header: {
             title: {
               tag: "plain_text",
-              content: "思考与工具 · 0 次工具调用",
+              content: "🛠️ Tool use pending",
+              i18n_content: {
+                zh_cn: "🛠️ 等待工具执行",
+                en_us: "🛠️ Tool use pending",
+              },
+              text_color: "grey",
+              text_size: "notation",
             },
             vertical_align: "center",
-          },
-          border: { color: "grey", corner_radius: "8px" },
-          padding: "8px 8px 8px 8px",
-          elements: [
-            {
-              tag: "markdown",
-              content: '<font color="grey">等待工具事件…</font>',
-              text_size: "x-small",
+            icon: {
+              tag: "standard_icon",
+              token: "down-small-ccm_outlined",
+              color: "grey",
+              size: "16px 16px",
             },
-          ],
+            icon_position: "right",
+            icon_expanded_angle: -180,
+          },
+          border: { color: "grey", corner_radius: "5px" },
+          vertical_spacing: "4px",
+          padding: "8px 8px 8px 8px",
+          elements: [],
         },
-        { tag: "hr", element_id: "main_divider" },
+        {
+          tag: "markdown",
+          content: `正在验证 ${title}、消息发送和 CardKit 更新链路…`,
+          element_id: "content",
+          text_size: "normal_v2",
+        },
         {
           tag: "markdown",
           element_id: "footer",
-          content: "⠋ 生成中",
-          text_size: "x-small",
+          content: "Processing",
+          i18n_content: { zh_cn: "处理中", en_us: "Processing" },
+          text_size: "notation",
         },
       ],
     },
