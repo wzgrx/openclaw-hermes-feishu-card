@@ -45,6 +45,9 @@
   real direct-dispatch metrics from `llm_output`, and enrich the channel-owned
   terminal card with a branded header plus accurate model, provider, reasoning,
   token, cache, context and cost lines without relying on a legacy session file.
+- Adapt OpenClaw beta's `runtime.config.current()` surface to the stable official
+  channel's `loadConfig()` contract so real WebSocket inbound messages work on
+  both runtime lines.
 
 ## 2.0.0
 

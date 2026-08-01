@@ -606,6 +606,32 @@ function loadOfficialSourceModules(root: string): {
   };
 }
 
+export function createOfficialPluginApi(
+  api: OpenClawPluginApi,
+): OpenClawPluginApi {
+  const runtime = record(api.runtime);
+  const runtimeConfig = record(runtime.config);
+  if (typeof runtimeConfig.loadConfig === "function") {
+    return api;
+  }
+  const current = runtimeConfig.current;
+  if (typeof current !== "function") {
+    throw new Error(
+      "OpenClaw runtime config exposes neither loadConfig() nor current()",
+    );
+  }
+  const currentConfig = current as (this: UnknownRecord) => unknown;
+  const compatibleConfig: UnknownRecord = {
+    ...runtimeConfig,
+    loadConfig: () => currentConfig.call(runtimeConfig),
+  };
+  const compatibleRuntime: UnknownRecord = {
+    ...runtime,
+    config: compatibleConfig,
+  };
+  return { ...api, runtime: compatibleRuntime } as unknown as OpenClawPluginApi;
+}
+
 export function patchNativeLarkModules(params: {
   builder: NativeBuilderModule;
   controller: NativeControllerModule;
@@ -717,7 +743,7 @@ export class NativeLarkIntegration {
       if (typeof official.register !== "function") {
         throw new Error("official plugin register() export is missing");
       }
-      official.register(this.api);
+      official.register(createOfficialPluginApi(this.api));
       const version = (
         JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")) as {
           version?: string;

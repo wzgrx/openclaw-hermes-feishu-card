@@ -2,12 +2,25 @@ import { describe, expect, it } from "vitest";
 
 import { resolveConfig } from "../src/core/config.js";
 import {
+  createOfficialPluginApi,
   enrichNativeLarkCard,
   NativeLarkMetricsRegistry,
   patchNativeLarkModules,
 } from "../src/openclaw/native-lark.js";
 
 describe("native @larksuite/openclaw-lark integration", () => {
+  it("adapts OpenClaw beta config.current() to the stable loadConfig() contract", () => {
+    const config = { channels: { feishu: { enabled: true } } };
+    const api = {
+      runtime: { config: { current: () => config } },
+    } as unknown as Parameters<typeof createOfficialPluginApi>[0];
+
+    const compatible = createOfficialPluginApi(api) as unknown as {
+      runtime: { config: { loadConfig: () => unknown } };
+    };
+    expect(compatible.runtime.config.loadConfig()).toBe(config);
+  });
+
   it("captures real per-call usage and keeps aggregate and context semantics separate", () => {
     const registry = new NativeLarkMetricsRegistry();
     const ctx = {

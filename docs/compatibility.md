@@ -30,6 +30,10 @@ Provider、模型、推理档位和逐调用用量，避免从旧 session store 
 按钮、位置、语音以及已经构造的飞书原生卡片保持官方通道投递。路由型普通文本仍
 由 `reply_payload_sending` bridge 处理。
 
+OpenClaw 稳定版公开 `runtime.config.loadConfig()`，较新的 beta 使用
+`runtime.config.current()`。集成层只为官方通道构造兼容视图，不修改宿主 runtime，
+并由单元测试和真实 WebSocket 入站测试同时覆盖。
+
 官方 lark-cli 适配器不替代在线回复通道。它通过 raw API 验证“应用凭据 →
 CardKit 创建 → IM 发送 → 内容更新 → 关闭流式状态”全链路，默认仅执行
 dry-run，适合安装器和 Agent 诊断。
