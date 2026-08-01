@@ -46,7 +46,7 @@
   <text x="700" y="484" class="ui normal">• 无品牌 Header、无仪表盘</text>
 
   <line x1="680" y1="585" x2="1200" y2="585" stroke="#e5e6eb"/>
-  <text x="680" y="625" class="ui small muted">已完成 · 耗时 1m 1s · gpt-5.4-mini</text>
+  <text x="680" y="625" class="ui small muted">已完成 · 耗时 1m 1s · doubao-seed-2-1-turbo-260628</text>
   <text x="680" y="657" class="ui small muted">↑ 86.0k ↓ 303 · 缓存 20.0k/1.0k (19%) · 上下文 86.0k/272k (32%)</text>
   <text x="680" y="745" class="ui tiny muted">真实模型 / Token / 缓存 / 末次 Prompt 上下文</text>
 
