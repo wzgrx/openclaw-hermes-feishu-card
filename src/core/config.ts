@@ -19,14 +19,14 @@ const panelsSchema = z
     reasoning: z.boolean().default(true),
     tools: z.boolean().default(true),
     progress: z.boolean().default(true),
-    resources: z.boolean().default(true),
+    resources: z.boolean().default(false),
     footer: z.boolean().default(true),
   })
   .default({
     reasoning: true,
     tools: true,
     progress: true,
-    resources: true,
+    resources: false,
     footer: true,
   });
 
@@ -40,11 +40,11 @@ const footerSchema = z
     cache: z.boolean().default(true),
     context: z.boolean().default(true),
     cost: z.boolean().default(true),
-    totals: z.boolean().default(true),
-    todayTokens: z.boolean().default(true),
-    monthTokens: z.boolean().default(true),
-    backgroundTasks: z.boolean().default(true),
-    balance: z.boolean().default(true),
+    totals: z.boolean().default(false),
+    todayTokens: z.boolean().default(false),
+    monthTokens: z.boolean().default(false),
+    backgroundTasks: z.boolean().default(false),
+    balance: z.boolean().default(false),
   })
   .default({
     status: true,
@@ -55,11 +55,11 @@ const footerSchema = z
     cache: true,
     context: true,
     cost: true,
-    totals: true,
-    todayTokens: true,
-    monthTokens: true,
-    backgroundTasks: true,
-    balance: true,
+    totals: false,
+    todayTokens: false,
+    monthTokens: false,
+    backgroundTasks: false,
+    balance: false,
   });
 
 export const cardFooterConfigSchema = z.object({

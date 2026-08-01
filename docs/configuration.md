@@ -35,11 +35,10 @@
 }
 ```
 
-`@larksuite/openclaw-lark` 2026.7.x 的入站路径直接调用旧版 reply
-dispatcher，不会安装跨插件的 `reply_payload_sending` 修改器。因此该组合必须保留
-上游通道的 CardKit controller：`streaming=true` 且
-`replyMode="streaming"`。本插件对支持标准 routed delivery 的通道继续使用原生
-Hook 接管；遇到富媒体或上游原生卡片时自动 fail-open，避免重复消息。
+OpenClaw 2026.7.x 会在入站 reply dispatcher 上安装
+`reply_payload_sending`，本插件在该 Hook 中接管普通文本回答；富媒体、审批、交互
+控件和上游已构造的原生卡片继续由飞书通道投递。独立的 CLI `--deliver` 等无入站
+上下文路径不用于验证自动接管链路。
 
 插件从以下位置依次解析飞书凭据：
 
@@ -85,7 +84,7 @@ panels:
   reasoning: true
   tools: true
   progress: true
-  resources: true
+  resources: false
   footer: true
 ```
 
@@ -101,12 +100,16 @@ footer:
   cache: true
   context: true
   cost: true
-  totals: true
-  today_tokens: true
-  month_tokens: true
-  background_tasks: true
-  balance: true
+  totals: false
+  today_tokens: false
+  month_tokens: false
+  background_tasks: false
+  balance: false
 ```
+
+模型、Token、上下文和本轮费用默认直接显示在回答底部；主机资源、本地累计、后台
+任务和余额缓存属于诊断数据，默认隐藏，启用后收进折叠的“诊断信息”面板。插件本地
+累计只代表插件成功捕获的回复，不代表供应商账户总量。
 
 OpenClaw 使用对应驼峰字段。后台任务读取 `/tmp/openclaw-tasks/*.json`，
 余额读取 `balance-cache.json`；读取器限制文件数和单文件大小，异常数据会被忽略。

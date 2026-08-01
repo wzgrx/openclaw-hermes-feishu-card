@@ -17,7 +17,7 @@ platforms:
         reasoning: true
         tools: true
         progress: true
-        resources: true
+        resources: false
         footer: true
       footer:
         status: true
@@ -28,11 +28,11 @@ platforms:
         cache: true
         context: true
         cost: true
-        totals: true
-        today_tokens: true
-        month_tokens: true
-        background_tasks: true
-        balance: true
+        totals: false
+        today_tokens: false
+        month_tokens: false
+        background_tasks: false
+        balance: false
       pricing:
         - pattern: openrouter/qwen-*
           currency: USD

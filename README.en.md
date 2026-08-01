@@ -8,10 +8,11 @@ A hybrid repository with two native integrations and one official CLI verificati
 
 Both render answer text, tool progress, runtime metrics, token usage and configured cost estimates in one CardKit 2.0 message. Media, files, voice, approvals, commands and inbound transport remain owned by the upstream Feishu channel adapters.
 
-The run-details panel keeps provider and model separate, exposes requested versus
-resolved routing when fallback occurs, and uses the final model call's prompt
-occupancy for context. Turn aggregates and final-call usage stay distinct;
-aggregate-only context fallbacks are explicitly marked as estimates.
+The always-visible compact footer shows the provider brand and ID, actual model,
+turn tokens, final-call prompt occupancy and turn cost. Requested versus resolved
+routing appears only when they differ. Host resources, local ledger totals and
+cached balances are opt-in diagnostics so incomplete data is not presented as an
+authoritative provider account total.
 
 ## Quick start
 

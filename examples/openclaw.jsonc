@@ -26,7 +26,7 @@
             "reasoning": true,
             "tools": true,
             "progress": true,
-            "resources": true,
+            "resources": false,
             "footer": true,
           },
           "footer": {
@@ -38,11 +38,11 @@
             "cache": true,
             "context": true,
             "cost": true,
-            "totals": true,
-            "todayTokens": true,
-            "monthTokens": true,
-            "backgroundTasks": true,
-            "balance": true,
+            "totals": false,
+            "todayTokens": false,
+            "monthTokens": false,
+            "backgroundTasks": false,
+            "balance": false,
           },
           "pricing": [
             {

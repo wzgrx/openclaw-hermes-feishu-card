@@ -178,21 +178,46 @@ function requestsPin(payload: Record<string, unknown>): boolean {
   return pin === true || record(pin).enabled === true;
 }
 
-function needsNativeDelivery(payload: Record<string, unknown>): boolean {
-  return (
+function nativeDeliveryReason(
+  payload: Record<string, unknown>,
+): string | undefined {
+  if (
     typeof payload.mediaUrl === "string" ||
-    (Array.isArray(payload.mediaUrls) && payload.mediaUrls.length > 0) ||
-    presentationHasControls(payload.presentation) ||
-    payload.interactive !== undefined ||
-    requestsPin(payload) ||
-    hasNativeChannelPayload(payload) ||
-    payload.btw !== undefined ||
-    payload.location !== undefined ||
-    payload.ttsSupplement !== undefined ||
-    payload.isCompactionNotice === true ||
-    payload.isFallbackNotice === true ||
-    payload.isStatusNotice === true
-  );
+    (Array.isArray(payload.mediaUrls) && payload.mediaUrls.length > 0)
+  ) {
+    return "media";
+  }
+  if (presentationHasControls(payload.presentation)) {
+    return "presentation-controls";
+  }
+  if (payload.interactive !== undefined) {
+    return "interactive";
+  }
+  if (requestsPin(payload)) {
+    return "pin";
+  }
+  if (hasNativeChannelPayload(payload)) {
+    return "channel-native-payload";
+  }
+  if (payload.btw !== undefined) {
+    return "btw";
+  }
+  if (payload.location !== undefined) {
+    return "location";
+  }
+  if (payload.ttsSupplement !== undefined) {
+    return "tts";
+  }
+  if (payload.isCompactionNotice === true) {
+    return "compaction-notice";
+  }
+  if (payload.isFallbackNotice === true) {
+    return "fallback-notice";
+  }
+  if (payload.isStatusNotice === true) {
+    return "status-notice";
+  }
+  return undefined;
 }
 
 export class OpenClawCardBridge {
@@ -324,7 +349,13 @@ export class OpenClawCardBridge {
       return;
     }
     const payload = event.payload as Record<string, unknown>;
-    if (needsNativeDelivery(payload)) {
+    const nativeReason = nativeDeliveryReason(payload);
+    if (nativeReason) {
+      if (event.kind === "final") {
+        this.api.logger.info(
+          `[openclaw-hermes-feishu-card] native passthrough reason=${nativeReason} channel=${channel}`,
+        );
+      }
       return;
     }
     const text =
@@ -349,6 +380,11 @@ export class OpenClawCardBridge {
       route: normalizeRoute(ctx),
     });
     const usage = normalizeOpenClawUsage(event.usageState);
+    if (event.kind === "final") {
+      this.api.logger.info(
+        `[openclaw-hermes-feishu-card] final captured key=${key} route=${resolveConversationId(ctx) ?? "missing"} usage=${usage ? "present" : "missing"} resolved=${usage?.resolvedRef ?? "missing"} context=${usage?.contextUsedTokens ?? "missing"}/${usage?.contextTokenBudget ?? "missing"}`,
+      );
+    }
     const renderedText =
       payload.isReasoning === true ? `Reasoning:\n${text}` : text;
     session.applyReply(

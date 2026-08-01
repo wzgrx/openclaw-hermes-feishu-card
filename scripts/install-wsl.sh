@@ -152,12 +152,17 @@ newEntry.config = {
   legacyTaskDir: pluginConfig.legacyTaskDir ?? "/tmp/openclaw-tasks",
   balanceCachePath:
     pluginConfig.balanceCachePath ?? "~/.openclaw/data/balance-cache.json",
+  panels: {
+    ...(pluginConfig.panels ?? {}),
+    resources: pluginConfig.panels?.resources ?? false,
+  },
   footer: {
     ...(pluginConfig.footer ?? {}),
-    todayTokens: pluginConfig.footer?.todayTokens ?? true,
-    monthTokens: pluginConfig.footer?.monthTokens ?? true,
-    backgroundTasks: pluginConfig.footer?.backgroundTasks ?? true,
-    balance: pluginConfig.footer?.balance ?? true,
+    totals: pluginConfig.footer?.totals ?? false,
+    todayTokens: pluginConfig.footer?.todayTokens ?? false,
+    monthTokens: pluginConfig.footer?.monthTokens ?? false,
+    backgroundTasks: pluginConfig.footer?.backgroundTasks ?? false,
+    balance: pluginConfig.footer?.balance ?? false,
   },
 };
 config.plugins.entries[newId] = newEntry;

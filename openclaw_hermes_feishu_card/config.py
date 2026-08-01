@@ -52,7 +52,7 @@ class Panels:
     reasoning: bool = True
     tools: bool = True
     progress: bool = True
-    resources: bool = True
+    resources: bool = False
     footer: bool = True
 
 
@@ -66,11 +66,11 @@ class Footer:
     cache: bool = True
     context: bool = True
     cost: bool = True
-    totals: bool = True
-    today_tokens: bool = True
-    month_tokens: bool = True
-    background_tasks: bool = True
-    balance: bool = True
+    totals: bool = False
+    today_tokens: bool = False
+    month_tokens: bool = False
+    background_tasks: bool = False
+    balance: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,7 +164,7 @@ class HermesCardConfig:
                 reasoning=_bool(panel_raw.get("reasoning"), True),
                 tools=_bool(panel_raw.get("tools"), True),
                 progress=_bool(panel_raw.get("progress"), True),
-                resources=_bool(panel_raw.get("resources"), True),
+                resources=_bool(panel_raw.get("resources"), False),
                 footer=_bool(panel_raw.get("footer"), True),
             ),
             footer=Footer(
@@ -176,20 +176,20 @@ class HermesCardConfig:
                 cache=_bool(footer_raw.get("cache"), True),
                 context=_bool(footer_raw.get("context"), True),
                 cost=_bool(footer_raw.get("cost"), True),
-                totals=_bool(footer_raw.get("totals"), True),
+                totals=_bool(footer_raw.get("totals"), False),
                 today_tokens=_bool(
                     footer_raw.get("todayTokens", footer_raw.get("today_tokens")),
-                    True,
+                    False,
                 ),
                 month_tokens=_bool(
                     footer_raw.get("monthTokens", footer_raw.get("month_tokens")),
-                    True,
+                    False,
                 ),
                 background_tasks=_bool(
                     footer_raw.get("backgroundTasks", footer_raw.get("background_tasks")),
-                    True,
+                    False,
                 ),
-                balance=_bool(footer_raw.get("balance"), True),
+                balance=_bool(footer_raw.get("balance"), False),
             ),
             pricing=tuple(pricing),
         )

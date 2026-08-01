@@ -73,7 +73,22 @@ def test_ledger_aggregates_day_month_and_all_time(tmp_path) -> None:
 
 
 def test_render_card_has_cardkit_v2_panels(tmp_path) -> None:
-    config = HermesCardConfig.from_extra({"card_footer": {"storage_dir": str(tmp_path), "title": "Hermes Bot"}})
+    config = HermesCardConfig.from_extra(
+        {
+            "card_footer": {
+                "storage_dir": str(tmp_path),
+                "title": "Hermes Bot",
+                "panels": {"resources": True},
+                "footer": {
+                    "totals": True,
+                    "today_tokens": True,
+                    "month_tokens": True,
+                    "background_tasks": True,
+                    "balance": True,
+                },
+            }
+        }
+    )
     session = CardSession(
         id="s1",
         route_key="chat",
@@ -82,6 +97,15 @@ def test_render_card_has_cardkit_v2_panels(tmp_path) -> None:
         metadata=None,
     )
     session.set_answer("hello **Feishu**")
+    session.usage = UsageSnapshot(
+        provider="volcengine",
+        model="doubao-seed",
+        input_tokens=1200,
+        output_tokens=300,
+        total_tokens=1500,
+        context_used_tokens=2000,
+        context_token_budget=128000,
+    )
     session.attachments = ["📎 report.pdf (application/pdf, 12 KB)"]
     session.upsert_tool(tool_id="0", name="search", input_preview='{"q":"test"}')
     card = render_card(
@@ -115,6 +139,9 @@ def test_render_card_has_cardkit_v2_panels(tmp_path) -> None:
     assert count_card_elements(card) >= 10
     assert "hello" in str(card)
     assert "Hermes Bot" in str(card)
+    assert "火山引擎 (volcengine)" in str(card)
+    assert "上下文 2,000 / 128,000 (1.6%)" in str(card)
+    assert "Diagnostics" in str(card)
     assert "report.pdf" in str(card)
     assert "RTX" in str(card)
     assert "同步知识库" in str(card)

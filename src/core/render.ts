@@ -93,40 +93,6 @@ function divider(): CardElement {
   return { tag: "hr", margin: "4px 0px 4px 0px" };
 }
 
-function columns(
-  items: Array<{ label: string; value: string; weight?: number }>,
-): CardElement {
-  return {
-    tag: "column_set",
-    flex_mode: "none",
-    background_style: "default",
-    horizontal_spacing: "12px",
-    columns: items.map((item) => ({
-      tag: "column",
-      width: "weighted",
-      weight: item.weight ?? 1,
-      vertical_align: "center",
-      elements: [
-        markdown(
-          `<font color='grey'>${item.label}</font>\n**${item.value}**`,
-          "notation",
-        ),
-      ],
-    })),
-  };
-}
-
-function columnRows(
-  items: Array<{ label: string; value: string; weight?: number }>,
-): CardElement[] {
-  const rowSize = items.length === 4 ? 2 : 3;
-  const rows: CardElement[] = [];
-  for (let index = 0; index < items.length; index += rowSize) {
-    rows.push(columns(items.slice(index, index + rowSize)));
-  }
-  return rows;
-}
-
 function fitCardByteBudget(card: CardJson): CardJson {
   const markdownNodes: CardElement[] = [];
   const visit = (value: unknown): void => {
@@ -345,13 +311,13 @@ function buildActivityStrip(
 function statusText(status: SessionSnapshot["status"]): string {
   switch (status) {
     case "running":
-      return "⏳ 运行中";
+      return "运行中";
     case "completed":
-      return "✅ 已完成";
+      return "已完成";
     case "failed":
-      return "❌ 出错";
+      return "出错";
     case "aborted":
-      return "⏹️ 已停止";
+      return "已停止";
   }
 }
 
@@ -360,50 +326,137 @@ function money(value: number, currency: "CNY" | "USD" | undefined): string {
   return `${symbol}${value.toFixed(value < 1 ? 4 : 2)}`;
 }
 
-function buildDetailsPanel(params: {
+const PROVIDER_LABELS: Readonly<Record<string, string>> = {
+  anthropic: "Anthropic",
+  azure: "Azure OpenAI",
+  dashscope: "阿里云百炼",
+  deepseek: "DeepSeek",
+  google: "Google",
+  groq: "Groq",
+  moonshot: "Moonshot",
+  openai: "OpenAI",
+  openrouter: "OpenRouter",
+  qwen: "阿里云百炼",
+  siliconflow: "硅基流动",
+  together: "Together AI",
+  volcengine: "火山引擎",
+  zhipu: "智谱 AI",
+};
+
+function providerLabel(provider: string | undefined): string | undefined {
+  const id = provider?.trim();
+  if (!id) {
+    return undefined;
+  }
+  const brand = PROVIDER_LABELS[id.toLowerCase()];
+  if (!brand) {
+    return id;
+  }
+  return brand.toLowerCase() === id.toLowerCase() ? brand : `${brand} (${id})`;
+}
+
+function buildRuntimeFooter(params: {
+  session: SessionSnapshot;
+  config: CardFooterConfig;
+  now: number;
+}): CardElement | undefined {
+  const { session, config, now } = params;
+  if (!config.panels.footer) {
+    return undefined;
+  }
+  const usage = session.usage;
+  const primary: string[] = [];
+  if (config.footer.status) {
+    primary.push(statusText(session.status));
+  }
+  if (config.footer.elapsed) {
+    primary.push(
+      `耗时 ${formatDuration(
+        session.status !== "running" && usage?.durationMs !== undefined
+          ? usage.durationMs
+          : (session.completedAt ?? now) - session.startedAt,
+      )}`,
+    );
+  }
+  if (config.footer.firstToken && session.firstTokenAt) {
+    primary.push(
+      `首 Token ${formatDuration(session.firstTokenAt - session.startedAt)}`,
+    );
+  }
+
+  const model: string[] = [];
+  if (config.footer.model) {
+    const provider = providerLabel(usage?.provider);
+    if (provider || usage?.model) {
+      model.push(
+        `模型 ${[provider, usage?.model].filter(Boolean).join(" · ")}`,
+      );
+    }
+    if (usage?.reasoningEffort) {
+      model.push(`推理 ${usage.reasoningEffort}`);
+    }
+    if (usage?.fastMode === true) {
+      model.push("快速模式");
+    }
+  }
+
+  const detail: string[] = [];
+  if (
+    config.footer.tokens &&
+    usage &&
+    (usage.inputTokens !== undefined || usage.outputTokens !== undefined)
+  ) {
+    detail.push(
+      `本轮 ↑ ${exactNumber(usage.inputTokens ?? 0)} ↓ ${exactNumber(usage.outputTokens ?? 0)}`,
+    );
+  }
+  if (
+    config.footer.cache &&
+    usage &&
+    ((usage.cacheReadTokens ?? 0) > 0 || (usage.cacheWriteTokens ?? 0) > 0)
+  ) {
+    detail.push(
+      `缓存 读 ${exactNumber(usage.cacheReadTokens ?? 0)} / 写 ${exactNumber(usage.cacheWriteTokens ?? 0)}`,
+    );
+  }
+  if (
+    config.footer.context &&
+    usage?.contextTokenBudget &&
+    usage.contextUsedTokens !== undefined
+  ) {
+    const used = usage.contextUsedTokens;
+    const percent = Math.min(999, (used / usage.contextTokenBudget) * 100);
+    detail.push(
+      `上下文 ${exactNumber(used)} / ${exactNumber(usage.contextTokenBudget)} (${percent.toFixed(1)}%)${usage.contextSource === "aggregate" ? " · 估算" : ""}`,
+    );
+  }
+  if (
+    config.footer.cost &&
+    usage?.turnCost !== undefined &&
+    usage.turnCost > 0
+  ) {
+    detail.push(`费用 ${money(usage.turnCost, usage.currency)}`);
+  }
+
+  const lines = [
+    primary.join(" · "),
+    model.join(" · "),
+    detail.join(" · "),
+  ].filter(Boolean);
+  return lines.length > 0 ? markdown(lines.join("\n"), "notation") : undefined;
+}
+
+function buildDiagnosticsPanel(params: {
   session: SessionSnapshot;
   totals: UsageTotals;
   config: CardFooterConfig;
   resource?: ResourceSnapshot;
   legacy?: LegacyRuntimeSnapshot;
-  now: number;
 }): CardElement | undefined {
-  const { session, totals, config, resource, legacy, now } = params;
+  const { session, totals, config, resource, legacy } = params;
   const usage = session.usage;
   const showFooter = config.panels.footer;
   const elements: CardElement[] = [];
-  const overview: Array<{ label: string; value: string; weight?: number }> = [];
-  if (showFooter && config.footer.status) {
-    overview.push({ label: "状态", value: statusText(session.status) });
-  }
-  if (showFooter && config.footer.elapsed) {
-    overview.push({
-      label: "耗时",
-      value: formatDuration(
-        session.status !== "running" && usage?.durationMs !== undefined
-          ? usage.durationMs
-          : (session.completedAt ?? now) - session.startedAt,
-      ),
-    });
-  }
-  if (showFooter && config.footer.firstToken && session.firstTokenAt) {
-    overview.push({
-      label: "首 Token",
-      value: formatDuration(session.firstTokenAt - session.startedAt),
-    });
-  }
-  if (showFooter && config.footer.model && usage?.provider) {
-    overview.push({
-      label: "供应商",
-      value: usage.provider,
-    });
-  }
-  if (showFooter && config.footer.model && usage?.model) {
-    overview.push({ label: "模型", value: usage.model, weight: 2 });
-  }
-  if (overview.length > 0) {
-    elements.push(...columnRows(overview));
-  }
 
   const routeLines: string[] = [];
   if (
@@ -414,80 +467,18 @@ function buildDetailsPanel(params: {
     usage.requestedRef.toLowerCase() !== usage.resolvedRef.toLowerCase()
   ) {
     routeLines.push(
-      `**模型路由**  ${usage.requestedRef} → ${usage.resolvedRef}${usage.fallbackUsed ? " · 已回退" : ""}`,
+      `**模型路由**  请求 ${usage.requestedRef} → 实际 ${usage.resolvedRef}${usage.fallbackUsed ? " · 已回退" : ""}`,
     );
   }
   const modeParts = [
-    usage?.reasoningEffort ? `推理 ${usage.reasoningEffort}` : undefined,
-    usage?.fastMode === true ? "快速模式" : undefined,
+    usage?.authMode ? `认证 ${usage.authMode}` : undefined,
     usage?.overrideSource ? `覆盖来源 ${usage.overrideSource}` : undefined,
   ].filter(Boolean);
   if (showFooter && config.footer.model && modeParts.length > 0) {
-    routeLines.push(`**模型配置**  ${modeParts.join(" · ")}`);
+    routeLines.push(`**路由配置**  ${modeParts.join(" · ")}`);
   }
   if (routeLines.length > 0) {
-    if (elements.length > 0) {
-      elements.push(divider());
-    }
     elements.push(markdown(routeLines.join("\n"), "notation"));
-  }
-
-  const usageItems: Array<{ label: string; value: string; weight?: number }> =
-    [];
-  if (
-    showFooter &&
-    config.footer.tokens &&
-    usage &&
-    (usage.inputTokens !== undefined || usage.outputTokens !== undefined)
-  ) {
-    usageItems.push({
-      label: "本轮累计",
-      value: `输入 ${exactNumber(usage.inputTokens ?? 0)} · 输出 ${exactNumber(usage.outputTokens ?? 0)}`,
-      weight: 2,
-    });
-  }
-  if (
-    showFooter &&
-    config.footer.cache &&
-    usage &&
-    ((usage.cacheReadTokens ?? 0) > 0 || (usage.cacheWriteTokens ?? 0) > 0)
-  ) {
-    usageItems.push({
-      label: "本轮缓存",
-      value: `读 ${exactNumber(usage.cacheReadTokens ?? 0)} · 写 ${exactNumber(usage.cacheWriteTokens ?? 0)}`,
-      weight: 2,
-    });
-  }
-  if (
-    showFooter &&
-    config.footer.context &&
-    usage?.contextTokenBudget &&
-    usage.contextUsedTokens !== undefined
-  ) {
-    const used = usage.contextUsedTokens;
-    const percent = Math.min(999, (used / usage.contextTokenBudget) * 100);
-    usageItems.push({
-      label: "上下文",
-      value: `${exactNumber(used)} / ${exactNumber(usage.contextTokenBudget)} · ${percent.toFixed(1)}%${usage.contextSource === "aggregate" ? " · 估算" : ""}`,
-      weight: 2,
-    });
-  }
-  if (
-    showFooter &&
-    config.footer.cost &&
-    usage?.turnCost !== undefined &&
-    usage.turnCost > 0
-  ) {
-    usageItems.push({
-      label: "本次费用",
-      value: money(usage.turnCost, usage.currency),
-    });
-  }
-  if (usageItems.length > 0) {
-    if (elements.length > 0) {
-      elements.push(divider());
-    }
-    elements.push(...columnRows(usageItems));
   }
 
   const hasLastCall =
@@ -516,7 +507,10 @@ function buildDetailsPanel(params: {
       elements.push(divider());
     }
     elements.push(
-      markdown(`**末次模型调用**  ${lastParts.join(" · ")}`, "notation"),
+      markdown(
+        `**末次模型调用**  ${lastParts.join(" · ")}\n<font color='grey'>“本轮”是工具循环内全部调用累计；“上下文”取最后一次调用的 Prompt 占用。</font>`,
+        "notation",
+      ),
     );
   }
 
@@ -530,7 +524,10 @@ function buildDetailsPanel(params: {
         : []),
       `总 ${compactNumber(totals.allTimeTokens)}`,
     ];
-    const totalLines = [`**累计用量**  ${tokenTotals.join(" · ")}`];
+    const totalLines = [
+      `**插件本地累计**  ${tokenTotals.join(" · ")}`,
+      "<font color='grey'>仅统计由本插件成功捕获并记录的回复，不代表供应商账户总量。</font>",
+    ];
     if (totals.allTimeCost > 0 && totals.currency) {
       const costTotals = [
         ...(config.footer.todayTokens
@@ -541,7 +538,7 @@ function buildDetailsPanel(params: {
           : []),
         `总 ${money(totals.allTimeCost, totals.currency)}`,
       ];
-      totalLines.push(`**累计费用**  ${costTotals.join(" · ")}`);
+      totalLines.push(`**插件本地费用**  ${costTotals.join(" · ")}`);
     }
     if (elements.length > 0) {
       elements.push(divider());
@@ -553,23 +550,11 @@ function buildDetailsPanel(params: {
     if (elements.length > 0) {
       elements.push(divider());
     }
-    elements.push(markdown("**🖥️ 系统资源**", "notation"));
     elements.push(
-      columns([
-        {
-          label: "CPU / Load",
-          value: `${resource.cpuPercent?.toFixed(0) ?? "-"}% · ${resource.loadAverage1m?.toFixed(2) ?? "-"}`,
-        },
-        {
-          label: "内存",
-          value: `${formatBytes(resource.memoryUsedBytes)} / ${formatBytes(resource.memoryTotalBytes)} · ${resource.memoryPercent.toFixed(0)}%`,
-          weight: 2,
-        },
-        {
-          label: "系统运行",
-          value: formatDuration(resource.uptimeSeconds * 1_000),
-        },
-      ]),
+      markdown(
+        `**主机资源**  CPU ${resource.cpuPercent?.toFixed(0) ?? "-"}% · Load ${resource.loadAverage1m?.toFixed(2) ?? "-"} · 内存 ${formatBytes(resource.memoryUsedBytes)} / ${formatBytes(resource.memoryTotalBytes)} (${resource.memoryPercent.toFixed(0)}%) · Uptime ${formatDuration(resource.uptimeSeconds * 1_000)}`,
+        "notation",
+      ),
     );
     if (resource.gpu) {
       const gpu = resource.gpu;
@@ -609,7 +594,7 @@ function buildDetailsPanel(params: {
   }
   if (showFooter && config.footer.balance && legacy?.balances.length) {
     taskLines.push(
-      `余额 ${legacy.balances
+      `余额缓存 ${legacy.balances
         .slice(0, 3)
         .map(
           (balance) =>
@@ -629,9 +614,9 @@ function buildDetailsPanel(params: {
     return undefined;
   }
   return panel({
-    titleZh: "运行详情",
-    titleEn: "Run details",
-    emoji: "⚙️",
+    titleZh: "诊断信息",
+    titleEn: "Diagnostics",
+    emoji: "🔎",
     expanded: false,
     elements,
   });
@@ -666,26 +651,18 @@ function statusTag(status: SessionSnapshot["status"]): {
   }
 }
 
-function headerSubtitle(session: SessionSnapshot, now: number): string {
-  const elapsed = formatDuration(
-    session.status !== "running" && session.usage?.durationMs !== undefined
-      ? session.usage.durationMs
-      : (session.completedAt ?? now) - session.startedAt,
-  );
+function headerSubtitle(session: SessionSnapshot): string | undefined {
   const runningTool = session.tools.findLast(
     (step) => step.status === "running",
   );
   if (session.status === "running") {
     return runningTool
-      ? `正在执行 ${runningTool.name} · ${elapsed}`
+      ? `正在执行 ${runningTool.name}`
       : session.answer
-        ? `正在生成回复 · ${elapsed}`
-        : `正在分析任务 · ${elapsed}`;
+        ? "正在生成回复"
+        : "正在分析任务";
   }
-  if (session.tools.length > 0) {
-    return `${session.tools.length} 个执行步骤 · ${elapsed}`;
-  }
-  return `本次回复 · ${elapsed}`;
+  return undefined;
 }
 
 export function renderCard(params: {
@@ -757,12 +734,37 @@ export function renderCard(params: {
     );
   }
 
-  if (config.panels.footer || config.panels.resources) {
-    const details = buildDetailsPanel({
+  const footer = buildRuntimeFooter({ session, config, now });
+  if (footer) {
+    elements.push(footer);
+  }
+
+  if (
+    config.panels.resources ||
+    config.footer.totals ||
+    config.footer.backgroundTasks ||
+    config.footer.balance ||
+    (config.footer.model &&
+      Boolean(
+        session.usage?.overrideSource ||
+        session.usage?.authMode ||
+        (session.usage?.requestedRef &&
+          session.usage?.resolvedRef &&
+          session.usage.requestedRef.toLowerCase() !==
+            session.usage.resolvedRef.toLowerCase()),
+      )) ||
+    (config.footer.tokens &&
+      Boolean(
+        session.usage?.lastInputTokens !== undefined ||
+        session.usage?.lastOutputTokens !== undefined ||
+        session.usage?.lastCacheReadTokens !== undefined ||
+        session.usage?.lastCacheWriteTokens !== undefined,
+      ))
+  ) {
+    const details = buildDiagnosticsPanel({
       session,
       totals: params.totals,
       config,
-      now,
       ...(params.resource ? { resource: params.resource } : {}),
       ...(params.legacy ? { legacy: params.legacy } : {}),
     });
@@ -782,6 +784,7 @@ export function renderCard(params: {
     config.title ??
     (session.runtime === "openclaw" ? "OpenClaw" : "Hermes");
   const tag = statusTag(session.status);
+  const subtitle = headerSubtitle(session);
   const headerTags: CardElement[] = [
     {
       tag: "text_tag",
@@ -825,10 +828,14 @@ export function renderCard(params: {
           en_us: title,
         },
       },
-      subtitle: {
-        tag: "plain_text",
-        content: headerSubtitle(session, now),
-      },
+      ...(subtitle
+        ? {
+            subtitle: {
+              tag: "plain_text",
+              content: subtitle,
+            },
+          }
+        : {}),
       text_tag_list: headerTags,
     },
     body: {

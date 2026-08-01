@@ -2,14 +2,14 @@
 
 ## 支持矩阵
 
-| 运行时          | 版本      | 集成面                                                       |
-| --------------- | --------- | ------------------------------------------------------------ |
-| OpenClaw        | 2026.7.x  | 标准 routed delivery 使用 `reply_payload_sending`、工具 Hook |
-| openclaw-lark   | 2026.7.x  | 2026.7.16 direct dispatcher；使用通道原生 CardKit controller |
-| Hermes Agent    | 0.19.x    | 已验证 PyPI 0.19.0 与源码标签 0.19.1                         |
-| 飞书 Node SDK   | 1.72.x    | CardKit v1、IM v1                                            |
-| 飞书 Python SDK | 1.6.8–1.x | CardKit v1、IM v1                                            |
-| lark-cli        | 1.0.80+   | raw API、JSON envelope、dry-run、bot 环境凭据                |
+| 运行时          | 版本      | 集成面                                                  |
+| --------------- | --------- | ------------------------------------------------------- |
+| OpenClaw        | 2026.7.x  | 入站 dispatcher 使用 `reply_payload_sending`、工具 Hook |
+| openclaw-lark   | 2026.7.x  | 2026.7.16；通道 controller 保留媒体与原生交互卡片       |
+| Hermes Agent    | 0.19.x    | 已验证 PyPI 0.19.0 与源码标签 0.19.1                    |
+| 飞书 Node SDK   | 1.72.x    | CardKit v1、IM v1                                       |
+| 飞书 Python SDK | 1.6.8–1.x | CardKit v1、IM v1                                       |
+| lark-cli        | 1.0.80+   | raw API、JSON envelope、dry-run、bot 环境凭据           |
 
 ## 通道职责
 
@@ -24,11 +24,10 @@
 
 上游通道仍负责媒体传输；本插件会在 Hermes 卡片内附加安全截断后的附件摘要。
 
-`@larksuite/openclaw-lark` 2026.7.16 的 direct dispatcher 不经过跨插件
-`reply_payload_sending` 修改器。安装器会为该组合写入
-`streaming=true`、`replyMode="streaming"`，由其原生 CardKit controller 保证
-OpenClaw 回复为卡片，并把 `status/elapsed/tokens/cache/context/model` 同步到
-通道原生 Footer；标准 routed delivery 与 Hermes 仍由本项目的桥接层渲染。
+OpenClaw 2026.7.x 会把 `reply_payload_sending` 安装到入站 dispatcher 的
+`beforeDeliver` 链。本插件只接管普通文本与纯文本 presentation；媒体、审批、按钮、
+位置、语音以及已经构造的飞书原生卡片保持通道投递。独立 CLI `--deliver` 没有入站
+会话上下文，不作为自动接管链路的端到端测试入口。
 
 官方 lark-cli 适配器不替代在线回复通道。它通过 raw API 验证“应用凭据 →
 CardKit 创建 → IM 发送 → 内容更新 → 关闭流式状态”全链路，默认仅执行

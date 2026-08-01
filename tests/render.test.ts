@@ -58,6 +58,14 @@ describe("renderCard", () => {
         storageDir: "./tmp-test",
         title: "Default Bot",
         accountTitles: { work: "Work Bot" },
+        panels: { resources: true },
+        footer: {
+          totals: true,
+          todayTokens: true,
+          monthTokens: true,
+          backgroundTasks: true,
+          balance: true,
+        },
       }),
       totals: {
         todayTokens: 10_000,
@@ -101,16 +109,19 @@ describe("renderCard", () => {
     expect((card.config as Record<string, unknown>).width_mode).toBe("fill");
     const serialized = JSON.stringify(card);
     expect(serialized).toContain("Work Bot");
-    expect(serialized).toContain("系统资源");
+    expect(serialized).toContain("主机资源");
     expect(serialized).toContain("Execution log");
     expect(serialized).toContain("正在持续更新结果");
-    expect(serialized).toContain("Run details");
-    expect(serialized).toContain("供应商");
+    expect(serialized).toContain("Diagnostics");
+    expect(serialized).toContain("模型 DeepSeek · deepseek-v4");
     expect(serialized).toContain("deepseek-v4");
     expect(serialized).toContain("模型路由");
     expect(serialized).toContain("router/auto");
-    expect(serialized).toContain("模型配置");
+    expect(serialized).toContain("推理 high");
+    expect(serialized).toContain("本轮 ↑ 1,200 ↓ 300");
+    expect(serialized).toContain("上下文 2,000 / 128,000 (1.6%)");
     expect(serialized).toContain("末次模型调用");
+    expect(serialized).toContain("插件本地累计");
     expect(serialized).toContain("后台任务");
     expect(serialized).toContain("DeepSeek");
     expect(serialized).not.toContain("100%");
@@ -152,7 +163,7 @@ describe("renderCard", () => {
 
     expect(serialized).toContain("这是最终答案。");
     expect(serialized).toContain("已完成");
-    expect(serialized).toContain("Run details");
+    expect(serialized).not.toContain("Diagnostics");
     expect(serialized).not.toContain("Task progress");
     expect(serialized).not.toContain("100%");
     expect(serialized).not.toContain("累计用量");

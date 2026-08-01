@@ -89,6 +89,10 @@ def _compact(value: int | float) -> str:
     return str(round(value))
 
 
+def _exact(value: int | float) -> str:
+    return f"{round(value):,}"
+
+
 def _duration(milliseconds: int | float) -> str:
     seconds = max(0.0, float(milliseconds)) / 1000
     if seconds < 60:
@@ -169,11 +173,21 @@ def _tools_panel(session: CardSession) -> dict[str, Any] | None:
             details.append(step.output_preview)
         if details:
             elements.append(_markdown("\n\n".join(details), "notation"))
+    completed = sum(step.status == "completed" for step in tools)
+    failed = sum(step.status == "failed" for step in tools)
+    running = sum(step.status == "running" for step in tools)
+    summary = " · ".join(
+        [
+            f"{completed} 已完成",
+            *([f"{running} 执行中"] if running else []),
+            *([f"{failed} 失败"] if failed else []),
+        ]
+    )
     return _panel(
-        f"工具步骤 · {len(tools)}",
-        f"Tool steps · {len(tools)}",
+        f"执行记录 · {summary}",
+        f"Execution log · {len(tools)} steps",
         "🛠️",
-        expanded=False,
+        expanded=running > 0 or failed > 0,
         elements=elements,
     )
 
@@ -181,7 +195,7 @@ def _tools_panel(session: CardSession) -> dict[str, Any] | None:
 def _progress_panel(session: CardSession) -> dict[str, Any]:
     total = len(session.tools)
     settled = sum(step.status != "running" for step in session.tools.values())
-    percent = 100 if session.status == "completed" else round(settled / total * 100) if total else 5
+    percent = round(settled / total * 100) if total else 0
     percent = min(100, max(0, percent))
     blocks = round(percent / 5)
     bar = "█" * blocks + "░" * (20 - blocks)
@@ -191,7 +205,7 @@ def _progress_panel(session: CardSession) -> dict[str, Any]:
         f"任务进度 · {percent}%",
         f"Task progress · {percent}%",
         "📊",
-        expanded=session.status == "running",
+        expanded=True,
         elements=[_markdown(f"`{bar}` **{percent}%**{detail}", "notation")],
     )
 
@@ -236,50 +250,105 @@ def _money(value: float, currency: str | None) -> str:
     return f"{symbol}{value:.4f}" if value < 0.01 else f"{symbol}{value:.2f}"
 
 
-def _footer(
-    session: CardSession,
+_PROVIDER_LABELS = {
+    "anthropic": "Anthropic",
+    "azure": "Azure OpenAI",
+    "dashscope": "阿里云百炼",
+    "deepseek": "DeepSeek",
+    "google": "Google",
+    "groq": "Groq",
+    "moonshot": "Moonshot",
+    "openai": "OpenAI",
+    "openrouter": "OpenRouter",
+    "qwen": "阿里云百炼",
+    "siliconflow": "硅基流动",
+    "together": "Together AI",
+    "volcengine": "火山引擎",
+    "zhipu": "智谱 AI",
+}
+
+
+def _provider_label(provider: str) -> str:
+    provider_id = provider.strip()
+    if not provider_id:
+        return ""
+    brand = _PROVIDER_LABELS.get(provider_id.lower())
+    if not brand:
+        return provider_id
+    return brand if brand.lower() == provider_id.lower() else f"{brand} ({provider_id})"
+
+
+def _footer(session: CardSession, config: HermesCardConfig, now: int) -> dict[str, Any] | None:
+    usage = session.usage
+    footer = config.footer
+    primary: list[str] = []
+    model: list[str] = []
+    detail: list[str] = []
+    if footer.status:
+        primary.append(_status(session.status).split(" ", 1)[-1])
+    if footer.elapsed:
+        elapsed = (
+            usage.duration_ms
+            if session.status != "running" and usage.duration_ms
+            else (session.completed_at or now) - session.started_at
+        )
+        primary.append(f"耗时 {_duration(elapsed)}")
+    if footer.first_token and session.first_token_at:
+        primary.append(f"首 Token {_duration(session.first_token_at - session.started_at)}")
+    if footer.model and (usage.provider or usage.model):
+        model.append("模型 " + " · ".join(part for part in (_provider_label(usage.provider), usage.model) if part))
+    if footer.tokens and (usage.input_tokens or usage.output_tokens or usage.total_tokens):
+        detail.append(f"本轮 ↑ {_exact(usage.input_tokens)} ↓ {_exact(usage.output_tokens)}")
+    if footer.cache and (usage.cache_read_tokens or usage.cache_write_tokens):
+        detail.append(f"缓存 读 {_exact(usage.cache_read_tokens)} / 写 {_exact(usage.cache_write_tokens)}")
+    if footer.context and usage.context_token_budget:
+        used = usage.context_used_tokens or usage.input_tokens
+        percent = min(999, used / usage.context_token_budget * 100)
+        detail.append(f"上下文 {_exact(used)} / {_exact(usage.context_token_budget)} ({percent:.1f}%)")
+    if footer.cost and usage.turn_cost is not None and usage.turn_cost > 0:
+        detail.append(f"费用 {_money(usage.turn_cost, usage.currency)}")
+    lines = [" · ".join(parts) for parts in (primary, model, detail) if parts]
+    return _markdown("\n".join(lines), "notation") if lines else None
+
+
+def _diagnostics(
     totals: UsageTotals,
     config: HermesCardConfig,
     legacy: LegacyRuntimeSnapshot | None,
-    now: int,
+    resource: ResourceSnapshot | None,
 ) -> dict[str, Any] | None:
-    items: list[str] = []
-    usage = session.usage
+    sections: list[str] = []
     footer = config.footer
-    if footer.status:
-        items.append(_status(session.status))
-    if footer.elapsed:
-        items.append(f"耗时 {_duration((session.completed_at or now) - session.started_at)}")
-    if footer.first_token and session.first_token_at:
-        items.append(f"首 Token {_duration(session.first_token_at - session.started_at)}")
-    if footer.model and (usage.provider or usage.model):
-        items.append("/".join(part for part in (usage.provider, usage.model) if part))
-    if footer.tokens and usage.total_tokens:
-        items.append(f"↑ {_compact(usage.input_tokens)} ↓ {_compact(usage.output_tokens)}")
-    if footer.cache and (usage.cache_read_tokens or usage.cache_write_tokens):
-        items.append(f"缓存 {_compact(usage.cache_read_tokens)}/{_compact(usage.cache_write_tokens)}")
-    if footer.context and usage.context_token_budget:
-        used = usage.context_used_tokens or usage.input_tokens
-        percent = min(999, round(used / usage.context_token_budget * 100))
-        items.append(f"上下文 {_compact(used)}/{_compact(usage.context_token_budget)} ({percent}%)")
-    if footer.cost and usage.turn_cost is not None:
-        items.append(f"本次 {_money(usage.turn_cost, usage.currency)}")
-    if footer.totals:
-        token_totals = []
-        if footer.today_tokens:
-            token_totals.append(f"今 {_compact(totals.today_tokens)}")
-        if footer.month_tokens:
-            token_totals.append(f"月 {_compact(totals.month_tokens)}")
-        token_totals.append(f"总 {_compact(totals.all_time_tokens)}")
-        items.append("Token " + "/".join(token_totals))
+    if footer.totals and totals.all_time_tokens:
+        token_totals = [
+            *([f"今 {_compact(totals.today_tokens)}"] if footer.today_tokens else []),
+            *([f"月 {_compact(totals.month_tokens)}"] if footer.month_tokens else []),
+            f"总 {_compact(totals.all_time_tokens)}",
+        ]
+        lines = [
+            "**插件本地累计**  " + " · ".join(token_totals),
+            "<font color='grey'>仅统计由本插件成功捕获并记录的回复, 不代表供应商账户总量。</font>",
+        ]
         if totals.all_time_cost and totals.currency:
-            cost_totals = []
-            if footer.today_tokens:
-                cost_totals.append(f"今 {_money(totals.today_cost, totals.currency)}")
-            if footer.month_tokens:
-                cost_totals.append(f"月 {_money(totals.month_cost, totals.currency)}")
-            cost_totals.append(f"总 {_money(totals.all_time_cost, totals.currency)}")
-            items.append("费用 " + "/".join(cost_totals))
+            cost_totals = [
+                *([f"今 {_money(totals.today_cost, totals.currency)}"] if footer.today_tokens else []),
+                *([f"月 {_money(totals.month_cost, totals.currency)}"] if footer.month_tokens else []),
+                f"总 {_money(totals.all_time_cost, totals.currency)}",
+            ]
+            lines.append("**插件本地费用**  " + " · ".join(cost_totals))
+        sections.append("\n".join(lines))
+    if config.panels.resources and resource is not None:
+        load = "-" if resource.load_average_1m is None else f"{resource.load_average_1m:.2f}"
+        cpu = "-" if resource.cpu_percent is None else f"{resource.cpu_percent:.0f}"
+        memory = f"{_bytes(resource.memory_used_bytes)} / {_bytes(resource.memory_total_bytes)}"
+        uptime = _duration(resource.uptime_seconds * 1000)
+        resource_lines = [
+            f"**主机资源**  CPU {cpu}% · Load {load} · 内存 {memory} ({resource.memory_percent:.0f}%) · Uptime {uptime}"
+        ]
+        if resource.gpu_name:
+            resource_lines.append(f"GPU {resource.gpu_name}")
+        sections.append("\n".join(resource_lines))
+    runtime_lines: list[str] = []
     if footer.background_tasks and legacy is not None:
         running = [task for task in legacy.tasks if task.status == "running"]
         stalled = [task for task in legacy.tasks if task.status == "stalled"]
@@ -287,25 +356,27 @@ def _footer(
             names = "、".join(
                 task.name if task.progress is None else f"{task.name} {round(task.progress)}%" for task in running[:3]
             )
-            items.append(f"后台任务 {len(running)} 个进行中: {names}")
+            runtime_lines.append(f"后台任务 {len(running)} 个进行中: {names}")
         if stalled:
-            items.append(f"⚠️ {len(stalled)} 个任务停滞: " + "、".join(task.name for task in stalled[:3]))
+            runtime_lines.append(f"⚠️ {len(stalled)} 个任务停滞: " + "、".join(task.name for task in stalled[:3]))
     if footer.balance and legacy is not None and legacy.balances:
-        items.append(
-            "余额 "
+        runtime_lines.append(
+            "余额缓存 "
             + " · ".join(
                 f"{'' if balance.available else '⚠️'}{balance.platform} ¥{balance.total:.2f}"
                 for balance in legacy.balances[:3]
             )
         )
-    if not items:
+    if runtime_lines:
+        sections.append("\n".join(runtime_lines))
+    if not sections:
         return None
     return _panel(
-        "运行统计",
-        "Runtime metrics",
-        "🪙",
+        "诊断信息",
+        "Diagnostics",
+        "🔎",
         expanded=False,
-        elements=[_markdown(" · ".join(items), "notation")],
+        elements=[_markdown(section, "notation") for section in sections],
     )
 
 
@@ -320,23 +391,8 @@ def render_card(
 ) -> dict[str, Any]:
     stamp = now or session.updated_at
     elements: list[dict[str, Any]] = []
-    if config.panels.resources and resource is not None:
-        elements.append(_resource_panel(resource))
-    tools = _tools_panel(session) if config.panels.tools else None
-    if tools is not None:
-        elements.append(tools)
-    if config.panels.progress:
+    if config.panels.progress and session.status == "running":
         elements.append(_progress_panel(session))
-    if config.panels.reasoning and session.reasoning:
-        elements.append(
-            _panel(
-                "思考过程",
-                "Reasoning",
-                "💭",
-                expanded=False,
-                elements=[_markdown(session.reasoning[-6_000:], "notation")],
-            )
-        )
     if session.notices and not session.answer:
         elements.append(_markdown(session.notices[-1], "notation"))
     if session.attachments:
@@ -351,10 +407,26 @@ def render_card(
     if len(answer) > MAX_ANSWER_CHARS:
         answer = answer[: MAX_ANSWER_CHARS - 20] + "\n\n…内容已截断"
     elements.append(_markdown(answer))
+    tools = _tools_panel(session) if config.panels.tools else None
+    if tools is not None:
+        elements.append(tools)
+    if config.panels.reasoning and session.status != "running" and session.reasoning.strip() != session.answer.strip():
+        elements.append(
+            _panel(
+                "分析摘要",
+                "Analysis summary",
+                "🧭",
+                expanded=False,
+                elements=[_markdown(session.reasoning[-6_000:], "notation")],
+            )
+        )
     if config.panels.footer:
-        footer = _footer(session, totals, config, legacy, stamp)
+        footer = _footer(session, config, stamp)
         if footer is not None:
             elements.append(footer)
+    diagnostics = _diagnostics(totals, config, legacy, resource)
+    if diagnostics is not None:
+        elements.append(diagnostics)
     summary = re.sub(r"[*_`#>\[\]()~]", "", answer).strip()[:120] or "Hermes 正在处理"
     return _fit_card_byte_budget(
         {
@@ -380,9 +452,34 @@ def render_card(
                     "content": config.title,
                     "i18n_content": {"zh_cn": config.title, "en_us": config.title},
                 },
-                "subtitle": {"tag": "plain_text", "content": _status(session.status)},
+                **(
+                    {
+                        "subtitle": {
+                            "tag": "plain_text",
+                            "content": "正在生成回复" if session.answer else "正在分析任务",
+                        }
+                    }
+                    if session.status == "running"
+                    else {}
+                ),
+                "text_tag_list": [
+                    {
+                        "tag": "text_tag",
+                        "text": {"tag": "plain_text", "content": _status(session.status).split(" ", 1)[-1]},
+                        "color": "blue"
+                        if session.status == "running"
+                        else "green"
+                        if session.status == "completed"
+                        else "red",
+                    }
+                ],
             },
-            "body": {"elements": elements},
+            "body": {
+                "direction": "vertical",
+                "vertical_spacing": "12px",
+                "padding": "14px 16px 16px 16px",
+                "elements": elements,
+            },
         }
     )
 

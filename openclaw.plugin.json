@@ -55,7 +55,7 @@
           "reasoning": { "type": "boolean", "default": true },
           "tools": { "type": "boolean", "default": true },
           "progress": { "type": "boolean", "default": true },
-          "resources": { "type": "boolean", "default": true },
+          "resources": { "type": "boolean", "default": false },
           "footer": { "type": "boolean", "default": true }
         }
       },
@@ -71,11 +71,11 @@
           "cache": { "type": "boolean", "default": true },
           "context": { "type": "boolean", "default": true },
           "cost": { "type": "boolean", "default": true },
-          "totals": { "type": "boolean", "default": true },
-          "todayTokens": { "type": "boolean", "default": true },
-          "monthTokens": { "type": "boolean", "default": true },
-          "backgroundTasks": { "type": "boolean", "default": true },
-          "balance": { "type": "boolean", "default": true }
+          "totals": { "type": "boolean", "default": false },
+          "todayTokens": { "type": "boolean", "default": false },
+          "monthTokens": { "type": "boolean", "default": false },
+          "backgroundTasks": { "type": "boolean", "default": false },
+          "balance": { "type": "boolean", "default": false }
         }
       },
       "pricing": {

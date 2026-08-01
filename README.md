@@ -8,7 +8,7 @@
 - **Hermes Agent**：Python 平台插件，继承 Hermes 原生 `FeishuAdapter`，保留 WebSocket、权限、附件、线程和命令能力，只替换回答的展示层。
 - **lark-cli**：调用官方 `larksuite/cli` 的 raw API 层，提供凭据不进入命令行参数的 CardKit dry-run 和端到端烟雾测试。
 
-它把回答、工具步骤、任务进度、思考摘要、主机资源、模型、Token、缓存、上下文和费用统计集中在一张流式卡片中。
+它把回答、工具步骤、任务进度、思考摘要和真实运行数据集中在一张流式卡片中；模型、Token、上下文和本轮费用始终采用紧凑可见 Footer，主机资源与本地累计只在启用诊断项时折叠展示。
 
 ## 设计特点
 
@@ -16,12 +16,13 @@
 - CardKit 2.0 全量更新，严格递增 `sequence`，结束时关闭流式状态。
 - 投递失败时保留上游原生文本链路。
 - 工具进度与回答共用卡片；媒体、审批、文件、语音继续走原生通道。
-- 供应商与模型分栏显示；回退时同时展示请求模型和实际模型，不把路由名
-  误当模型名。
+- 供应商品牌、Provider ID 与实际模型同一行显示；回退时同时展示请求模型和实际
+  模型，不把路由名误当模型名。
 - 上下文使用末次模型调用的真实 Prompt 占用，不使用多工具循环的累计输入量；
   仅有累计值时明确标记为估算。
 - OpenClaw 与 Hermes 可写入同一份追加式 `usage.ndjson`。
-- 支持多账户卡片标题、附件摘要、GPU、旧版后台任务和供应商余额缓存。
+- 支持多账户卡片标题、附件摘要、GPU、旧版后台任务和供应商余额缓存；这些可能
+  不完整或过期的诊断项默认关闭，并明确标注本地/缓存语义。
 - App Secret 只从现有运行时配置或环境变量读取，日志中不输出凭据。
 - 中文/英文卡片标题与摘要，默认时区为 `Asia/Shanghai`。
 - `doctor --runtime --fix` 可检测并修复 direct dispatcher、原生 Footer、插件启用和 lark-cli CardKit 路由。
@@ -70,7 +71,7 @@ openclaw plugins enable openclaw-hermes-feishu-card
 openclaw plugins doctor
 ```
 
-将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。使用 `@larksuite/openclaw-lark` 2026.7.x 时，将飞书通道设置为 `streaming: true`、`replyMode: "streaming"`；该版本的旧版 direct dispatcher 由通道原生 CardKit controller 负责最终卡片投递。
+将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。使用 `@larksuite/openclaw-lark` 2026.7.x 时，将飞书通道设置为 `streaming: true`、`replyMode: "streaming"`；普通入站回答由标准 `reply_payload_sending` Hook 接管，媒体和原生交互卡片继续交给通道 controller。
 
 运行时诊断和自动修复：
 

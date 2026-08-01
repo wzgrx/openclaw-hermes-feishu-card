@@ -16,12 +16,13 @@ describe("configuration", () => {
       reasoning: true,
       tools: true,
       progress: true,
-      resources: true,
+      resources: false,
       footer: true,
     });
     expect(config.footer.tokens).toBe(true);
-    expect(config.footer.backgroundTasks).toBe(true);
-    expect(config.footer.balance).toBe(true);
+    expect(config.footer.totals).toBe(false);
+    expect(config.footer.backgroundTasks).toBe(false);
+    expect(config.footer.balance).toBe(false);
     expect(config.title).toBe("OpenClaw");
     expect(config.captureChannels).toContain("feishu");
   });
