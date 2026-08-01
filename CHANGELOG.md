@@ -48,6 +48,9 @@
 - Adapt OpenClaw beta's `runtime.config.current()` surface to the stable official
   channel's `loadConfig()` contract so real WebSocket inbound messages work on
   both runtime lines.
+- Share direct-dispatch metrics across repeated runtime registrations, keep the
+  answer before execution details, and present model/provider/mode, exact usage,
+  context, cost and first-byte latency in one expanded run-details dashboard.
 
 ## 2.0.0
 

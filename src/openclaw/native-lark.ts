@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
+import { resolveThinkingDefault } from "openclaw/plugin-sdk/agent-runtime";
 
 import type { CardFooterConfig } from "../core/index.js";
 
@@ -28,9 +29,15 @@ interface LlmOutputEvent {
   resolvedRef?: string;
   contextTokenBudget?: number;
   reasoningEffort?: string;
+  reasoningEffortDefault?: boolean;
   fastMode?: boolean;
   lastAssistant?: unknown;
   usage?: TokenUsage;
+}
+
+interface ModelCallEndedEvent {
+  runId: string;
+  timeToFirstByteMs?: number;
 }
 
 interface AgentEndEvent {
@@ -54,6 +61,7 @@ export interface NativeLarkMetrics {
   model?: string | undefined;
   resolvedRef?: string | undefined;
   reasoningEffort?: string | undefined;
+  reasoningEffortDefault?: boolean | undefined;
   fastMode?: boolean | undefined;
   contextTokenBudget?: number | undefined;
   contextUsedTokens?: number | undefined;
@@ -68,6 +76,7 @@ export interface NativeLarkMetrics {
   lastCacheWriteTokens?: number | undefined;
   lastTotalTokens?: number | undefined;
   turnCostUsd?: number | undefined;
+  firstTokenMs?: number | undefined;
   durationMs?: number | undefined;
   updatedAt: number;
 }
@@ -85,9 +94,11 @@ interface NativeFooterMetrics {
   provider?: string | undefined;
   resolvedRef?: string | undefined;
   reasoningEffort?: string | undefined;
+  reasoningEffortDefault?: boolean | undefined;
   fastMode?: boolean | undefined;
   contextUsedTokens?: number | undefined;
   turnCostUsd?: number | undefined;
+  firstTokenMs?: number | undefined;
   durationMs?: number | undefined;
   accountId?: string | undefined;
 }
@@ -107,6 +118,7 @@ interface NativeBuilderModule extends UnknownRecord {
     state: string,
     data?: NativeCardData,
   ) => Record<string, unknown>;
+  toCardKit2?: (card: Record<string, unknown>) => Record<string, unknown>;
 }
 
 interface NativeControllerModule extends UnknownRecord {
@@ -120,6 +132,7 @@ interface NativeControllerModule extends UnknownRecord {
 interface NativePatchState {
   registry: NativeLarkMetricsRegistry;
   config: CardFooterConfig;
+  logInfo?: ((message: string) => void) | undefined;
 }
 
 interface OfficialPluginDefinition {
@@ -133,7 +146,14 @@ const PATCH_STATE = Symbol.for(
 const PATCHED_CONTROLLER = Symbol.for(
   "openclaw-hermes-feishu-card.native-lark-controller-patched",
 );
+const PATCHED_CARDKIT = Symbol.for(
+  "openclaw-hermes-feishu-card.native-lark-cardkit-patched",
+);
 const TEN_MINUTES_MS = 10 * 60 * 1_000;
+
+interface NativeMetricsGlobal {
+  __openclawHermesFeishuCardNativeMetrics?: NativeLarkMetricsRegistry;
+}
 
 function record(value: unknown): UnknownRecord {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -259,11 +279,48 @@ export class NativeLarkMetricsRegistry {
     current.model = event.model || current.model;
     current.resolvedRef = event.resolvedRef ?? current.resolvedRef;
     current.reasoningEffort = event.reasoningEffort ?? current.reasoningEffort;
+    current.reasoningEffortDefault =
+      event.reasoningEffortDefault ?? current.reasoningEffortDefault;
     current.fastMode = event.fastMode ?? current.fastMode;
     const cost = extractAssistantCost(event.lastAssistant);
     if (cost !== undefined) {
       current.turnCostUsd = (current.turnCostUsd ?? 0) + cost;
     }
+    current.updatedAt = Date.now();
+    this.entries.set(sessionKey, current);
+  }
+
+  captureModelCallEnded(
+    event: ModelCallEndedEvent,
+    ctx: AgentHookContext,
+  ): void {
+    if (!isFeishuContext(ctx)) {
+      return;
+    }
+    const sessionKey = normalizeSessionKey(ctx.sessionKey);
+    if (!sessionKey) {
+      return;
+    }
+    const timeToFirstByteMs = finite(event.timeToFirstByteMs);
+    if (timeToFirstByteMs === undefined) {
+      return;
+    }
+    this.prune();
+    const previous = this.entries.get(sessionKey);
+    const current =
+      previous?.runId === event.runId
+        ? previous
+        : {
+            runId: event.runId,
+            sessionKey,
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+            totalTokens: 0,
+            updatedAt: Date.now(),
+          };
+    current.firstTokenMs ??= timeToFirstByteMs;
     current.updatedAt = Date.now();
     this.entries.set(sessionKey, current);
   }
@@ -297,6 +354,13 @@ export class NativeLarkMetricsRegistry {
       }
     }
   }
+}
+
+function sharedNativeMetricsRegistry(): NativeLarkMetricsRegistry {
+  const store = globalThis as unknown as NativeMetricsGlobal;
+  store.__openclawHermesFeishuCardNativeMetrics ??=
+    new NativeLarkMetricsRegistry();
+  return store.__openclawHermesFeishuCardNativeMetrics;
 }
 
 function exactNumber(value: number): string {
@@ -349,50 +413,66 @@ function providerLabel(provider: string | undefined): string | undefined {
   return `${brand} (${id})`;
 }
 
-function footerElement(params: {
+function footerElements(params: {
   data: NativeCardData;
   metrics?: NativeFooterMetrics | undefined;
   config: CardFooterConfig;
-}): UnknownRecord | undefined {
+}): UnknownRecord[] {
   const { data, metrics, config } = params;
   if (!config.panels.footer) {
-    return undefined;
+    return [];
   }
-  const primary: string[] = [];
+  const summary: string[] = [];
   if (config.footer.status) {
-    primary.push(data.isError ? "出错" : data.isAborted ? "已停止" : "已完成");
+    summary.push(
+      data.isError ? "执行异常" : data.isAborted ? "已停止" : "已完成",
+    );
   }
   if (config.footer.elapsed) {
     const elapsed = formatDuration(data.elapsedMs ?? metrics?.durationMs);
     if (elapsed) {
-      primary.push(`耗时 ${elapsed}`);
+      summary.push(`耗时 ${elapsed}`);
+    }
+  }
+  if (config.footer.firstToken) {
+    const firstToken = formatDuration(metrics?.firstTokenMs);
+    if (firstToken) {
+      summary.push(`首字节 ${firstToken}`);
     }
   }
 
-  const model: string[] = [];
+  const rows: string[] = [];
   if (config.footer.model && metrics) {
     const provider = providerLabel(metrics.provider);
-    if (provider || metrics.model) {
-      model.push(
-        `模型 ${[provider, metrics.model].filter(Boolean).join(" · ")}`,
+    if (metrics.model) {
+      rows.push(`**模型**  ${metrics.model}`);
+    }
+    const mode: string[] = [];
+    if (metrics.reasoningEffort) {
+      mode.push(
+        `推理 ${metrics.reasoningEffort}${metrics.reasoningEffortDefault ? "（默认）" : ""}`,
       );
     }
-    if (metrics.reasoningEffort) {
-      model.push(`推理 ${metrics.reasoningEffort}`);
-    }
     if (metrics.fastMode === true) {
-      model.push("快速模式");
+      mode.push("快速模式");
+    }
+    const providerAndMode = [
+      provider ? `**提供方**  ${provider}` : undefined,
+      mode.length > 0 ? `**模式**  ${mode.join(" · ")}` : undefined,
+    ].filter(Boolean);
+    if (providerAndMode.length > 0) {
+      rows.push(providerAndMode.join("  ·  "));
     }
   }
 
-  const detail: string[] = [];
+  const usage: string[] = [];
   if (
     config.footer.tokens &&
     metrics?.inputTokens !== undefined &&
     metrics.outputTokens !== undefined
   ) {
-    detail.push(
-      `本轮 ↑ ${exactNumber(metrics.inputTokens)} ↓ ${exactNumber(metrics.outputTokens)}`,
+    usage.push(
+      `输入 ${exactNumber(metrics.inputTokens)} · 输出 ${exactNumber(metrics.outputTokens)}`,
     );
   }
   if (
@@ -400,9 +480,12 @@ function footerElement(params: {
     metrics &&
     ((metrics.cacheRead ?? 0) > 0 || (metrics.cacheWrite ?? 0) > 0)
   ) {
-    detail.push(
-      `缓存 读 ${exactNumber(metrics.cacheRead ?? 0)} / 写 ${exactNumber(metrics.cacheWrite ?? 0)}`,
+    usage.push(
+      `缓存读 ${exactNumber(metrics.cacheRead ?? 0)} · 缓存写 ${exactNumber(metrics.cacheWrite ?? 0)}`,
     );
+  }
+  if (usage.length > 0) {
+    rows.push(`**本轮用量**  ${usage.join("  ·  ")}`);
   }
   if (
     config.footer.context &&
@@ -414,33 +497,68 @@ function footerElement(params: {
       999,
       (metrics.contextUsedTokens / metrics.contextTokens) * 100,
     );
-    detail.push(
-      `上下文 ${exactNumber(metrics.contextUsedTokens)} / ${exactNumber(metrics.contextTokens)} (${percent.toFixed(1)}%)`,
+    const cost =
+      config.footer.cost &&
+      metrics.turnCostUsd !== undefined &&
+      metrics.turnCostUsd > 0
+        ? `  ·  **费用**  $${metrics.turnCostUsd.toFixed(4)}`
+        : "";
+    rows.push(
+      `**上下文**  ${exactNumber(metrics.contextUsedTokens)} / ${exactNumber(metrics.contextTokens)} · ${percent.toFixed(1)}%${cost}`,
     );
-  }
-  if (
+  } else if (
     config.footer.cost &&
     metrics?.turnCostUsd !== undefined &&
     metrics.turnCostUsd > 0
   ) {
-    detail.push(`费用 $${metrics.turnCostUsd.toFixed(4)}`);
+    rows.push(`**费用**  $${metrics.turnCostUsd.toFixed(4)}`);
   }
 
-  const lines = [
-    primary.join(" · "),
-    model.join(" · "),
-    detail.join(" · "),
-  ].filter(Boolean);
-  if (lines.length === 0) {
-    return undefined;
+  if (summary.length === 0 && rows.length === 0) {
+    return [];
   }
-  const content = lines.join("\n");
-  return {
-    tag: "markdown",
-    content,
-    i18n_content: { zh_cn: content, en_us: content },
-    text_size: "notation",
-  };
+  const title = `📊 运行详情${summary.length > 0 ? ` · ${summary.join(" · ")}` : ""}`;
+  const content = rows.join("\n");
+  return [
+    { tag: "hr", margin: "6px 0px 2px 0px" },
+    {
+      tag: "collapsible_panel",
+      expanded: true,
+      margin: "2px 0px 0px 0px",
+      header: {
+        title: {
+          tag: "plain_text",
+          content: title,
+          i18n_content: { zh_cn: title, en_us: title },
+        },
+        background_color: "grey",
+        vertical_align: "center",
+        padding: "8px 12px 8px 12px",
+        icon: {
+          tag: "standard_icon",
+          token: "down-small-ccm_outlined",
+          color: "grey",
+          size: "16px 16px",
+        },
+        icon_position: "right",
+        icon_expanded_angle: -180,
+      },
+      border: { color: "grey", corner_radius: "8px" },
+      vertical_spacing: "6px",
+      padding: "10px 12px 10px 12px",
+      elements:
+        content.length > 0
+          ? [
+              {
+                tag: "markdown",
+                content,
+                i18n_content: { zh_cn: content, en_us: content },
+                text_size: "notation",
+              },
+            ]
+          : [],
+    },
+  ];
 }
 
 export function enrichNativeLarkCard(params: {
@@ -453,14 +571,24 @@ export function enrichNativeLarkCard(params: {
   const elements: unknown[] = Array.isArray(rawElements)
     ? rawElements.map((element: unknown) => element)
     : [];
-  const footer = footerElement({
+  const footer = footerElements({
     data,
     metrics: data.footerMetrics,
     config,
   });
-  if (footer) {
-    elements.push(footer);
+  // The official complete-card builder renders the execution accordion before
+  // the answer. Move the final top-level markdown answer to the front so the
+  // result is visually primary and logs remain contextual detail.
+  const answerIndex = elements.findLastIndex(
+    (element) => record(element).tag === "markdown",
+  );
+  if (answerIndex > 0) {
+    const [answer] = elements.splice(answerIndex, 1);
+    if (answer) {
+      elements.unshift(answer);
+    }
   }
+  elements.push(...footer);
   const accountId = data.footerMetrics?.accountId;
   const title =
     (accountId ? config.accountTitles[accountId] : undefined) ?? config.title;
@@ -470,18 +598,31 @@ export function enrichNativeLarkCard(params: {
       ? "已停止"
       : "已完成";
   const color = data.isError ? "red" : data.isAborted ? "neutral" : "green";
+  const toolCount = Array.isArray(data.toolUseSteps)
+    ? data.toolUseSteps.length
+    : 0;
+  const tags: UnknownRecord[] = [
+    {
+      tag: "text_tag",
+      text: { tag: "plain_text", content: status },
+      color,
+    },
+  ];
+  if (toolCount > 0) {
+    tags.push({
+      tag: "text_tag",
+      text: { tag: "plain_text", content: `${toolCount} 步` },
+      color: "neutral",
+    });
+  }
   return {
     ...card,
     header: {
       template: data.isError ? "red" : data.isAborted ? "grey" : "green",
+      padding: "12px 16px 12px 16px",
       title: { tag: "plain_text", content: title },
-      text_tag_list: [
-        {
-          tag: "text_tag",
-          text: { tag: "plain_text", content: status },
-          color,
-        },
-      ],
+      subtitle: { tag: "plain_text", content: "智能任务卡片" },
+      text_tag_list: tags,
     },
     elements,
   };
@@ -504,9 +645,11 @@ function asFooterMetrics(
     provider: entry.provider,
     resolvedRef: entry.resolvedRef,
     reasoningEffort: entry.reasoningEffort,
+    reasoningEffortDefault: entry.reasoningEffortDefault,
     fastMode: entry.fastMode,
     contextUsedTokens: entry.contextUsedTokens,
     turnCostUsd: entry.turnCostUsd,
+    firstTokenMs: entry.firstTokenMs,
     durationMs: entry.durationMs,
     accountId,
   };
@@ -637,8 +780,9 @@ export function patchNativeLarkModules(params: {
   controller: NativeControllerModule;
   registry: NativeLarkMetricsRegistry;
   config: CardFooterConfig;
+  logInfo?: ((message: string) => void) | undefined;
 }): void {
-  const { builder, controller, registry, config } = params;
+  const { builder, controller, registry, config, logInfo } = params;
   const builderState = builder as NativeBuilderModule & {
     [PATCH_STATE]?: NativePatchState;
   };
@@ -646,8 +790,9 @@ export function patchNativeLarkModules(params: {
   if (existingState) {
     existingState.registry = registry;
     existingState.config = config;
+    existingState.logInfo = logInfo;
   } else {
-    const state: NativePatchState = { registry, config };
+    const state: NativePatchState = { registry, config, logInfo };
     const originalBuild = builder.buildCardContent.bind(builder);
     builder.buildCardContent = (cardState, rawData = {}) => {
       if (cardState !== "complete") {
@@ -674,6 +819,32 @@ export function patchNativeLarkModules(params: {
     builderState[PATCH_STATE] = state;
   }
 
+  const cardKitBuilder = builder as NativeBuilderModule & {
+    [PATCHED_CARDKIT]?: boolean;
+  };
+  if (!cardKitBuilder[PATCHED_CARDKIT] && builder.toCardKit2) {
+    const originalToCardKit2 = builder.toCardKit2.bind(builder);
+    builder.toCardKit2 = (card) => {
+      const result = originalToCardKit2(card);
+      return {
+        ...result,
+        config: {
+          ...record(result.config),
+          width_mode: "fill",
+          update_multi: true,
+          locales: ["zh_cn", "en_us"],
+        },
+        body: {
+          ...record(result.body),
+          direction: "vertical",
+          vertical_spacing: "12px",
+          padding: "14px 16px 16px 16px",
+        },
+      };
+    };
+    cardKitBuilder[PATCHED_CARDKIT] = true;
+  }
+
   const prototype = controller.StreamingCardController
     .prototype as typeof controller.StreamingCardController.prototype & {
     [PATCHED_CONTROLLER]?: boolean;
@@ -685,6 +856,9 @@ export function patchNativeLarkModules(params: {
       const state = builderState[PATCH_STATE];
       const entry = state?.registry.get(this.deps?.sessionKey);
       if (entry) {
+        state?.logInfo?.(
+          `[openclaw-hermes-feishu-card] native metrics applied provider=${entry.provider ?? "-"} model=${entry.model ?? "-"} input=${entry.inputTokens} output=${entry.outputTokens} context=${entry.contextUsedTokens ?? "-"}/${entry.contextTokenBudget ?? "-"}`,
+        );
         return asFooterMetrics(entry, this.deps?.accountId);
       }
       return originalGet.call(this);
@@ -699,8 +873,34 @@ function externalLarkEnabled(config: unknown): boolean {
   return entry.enabled === true;
 }
 
+function configuredThinkingEffort(
+  api: OpenClawPluginApi,
+  event: LlmOutputEvent,
+): string | undefined {
+  try {
+    const runtimeConfig = record(record(api.runtime).config);
+    const loader =
+      typeof runtimeConfig.loadConfig === "function"
+        ? runtimeConfig.loadConfig
+        : runtimeConfig.current;
+    if (typeof loader !== "function") {
+      return undefined;
+    }
+    const cfg = loader.call(runtimeConfig) as Parameters<
+      typeof resolveThinkingDefault
+    >[0]["cfg"];
+    return resolveThinkingDefault({
+      cfg,
+      provider: event.provider,
+      model: event.model,
+    });
+  } catch {
+    return undefined;
+  }
+}
+
 export class NativeLarkIntegration {
-  readonly registry = new NativeLarkMetricsRegistry();
+  readonly registry = sharedNativeMetricsRegistry();
 
   constructor(
     private readonly api: OpenClawPluginApi,
@@ -709,7 +909,27 @@ export class NativeLarkIntegration {
 
   register(): void {
     this.api.on("llm_output", (event, ctx) => {
-      this.registry.capture(event, ctx);
+      const reasoningEffort =
+        event.reasoningEffort ?? configuredThinkingEffort(this.api, event);
+      this.registry.capture(
+        {
+          ...event,
+          ...(reasoningEffort ? { reasoningEffort } : {}),
+          ...(!event.reasoningEffort && reasoningEffort
+            ? { reasoningEffortDefault: true }
+            : {}),
+        },
+        ctx,
+      );
+      const entry = this.registry.get(ctx.sessionKey);
+      if (entry?.runId === event.runId) {
+        this.api.logger.info(
+          `[openclaw-hermes-feishu-card] native metrics captured provider=${entry.provider ?? "-"} model=${entry.model ?? "-"} reasoning=${entry.reasoningEffort ?? "-"}${entry.reasoningEffortDefault ? "(default)" : ""} input=${entry.inputTokens} output=${entry.outputTokens} context=${entry.contextUsedTokens ?? "-"}/${entry.contextTokenBudget ?? "-"}`,
+        );
+      }
+    });
+    this.api.on("model_call_ended", (event, ctx) => {
+      this.registry.captureModelCallEnded(event, ctx);
     });
     this.api.on("agent_end", (event, ctx) => {
       this.registry.finish(event, ctx);
@@ -738,6 +958,7 @@ export class NativeLarkIntegration {
         controller: officialSource.controller,
         registry: this.registry,
         config: this.config,
+        logInfo: (message) => this.api.logger.info(message),
       });
       const official = officialSource.official;
       if (typeof official.register !== "function") {

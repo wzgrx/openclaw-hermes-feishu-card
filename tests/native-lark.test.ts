@@ -6,9 +6,18 @@ import {
   enrichNativeLarkCard,
   NativeLarkMetricsRegistry,
   patchNativeLarkModules,
+  NativeLarkIntegration,
 } from "../src/openclaw/native-lark.js";
 
 describe("native @larksuite/openclaw-lark integration", () => {
+  it("shares one metrics registry across repeated OpenClaw plugin registrations", () => {
+    const api = {} as Parameters<typeof createOfficialPluginApi>[0];
+    const config = resolveConfig({});
+    expect(new NativeLarkIntegration(api, config).registry).toBe(
+      new NativeLarkIntegration(api, config).registry,
+    );
+  });
+
   it("adapts OpenClaw beta config.current() to the stable loadConfig() contract", () => {
     const config = { channels: { feishu: { enabled: true } } };
     const api = {
@@ -76,18 +85,24 @@ describe("native @larksuite/openclaw-lark integration", () => {
     });
   });
 
-  it("adds a branded header and a compact three-line runtime footer", () => {
+  it("adds an answer-first header and an expanded structured runtime panel", () => {
     const card = enrichNativeLarkCard({
       card: {
         config: { wide_screen_mode: true },
-        elements: [{ tag: "markdown", content: "最终答案" }],
+        elements: [
+          { tag: "collapsible_panel", elements: [], expanded: false },
+          { tag: "markdown", content: "最终答案" },
+        ],
       },
       data: {
         elapsedMs: 28_800,
+        toolUseSteps: [{ name: "system" }],
         footerMetrics: {
           provider: "volcengine",
           model: "doubao-seed-2-1-turbo-260628",
           reasoningEffort: "medium",
+          reasoningEffortDefault: true,
+          firstTokenMs: 5_420,
           inputTokens: 57_370,
           outputTokens: 22,
           contextUsedTokens: 57_370,
@@ -101,15 +116,31 @@ describe("native @larksuite/openclaw-lark integration", () => {
     expect(card.header).toMatchObject({
       template: "green",
       title: { content: "OpenClaw" },
+      subtitle: { content: "智能任务卡片" },
+      text_tag_list: [
+        { text: { content: "已完成" } },
+        { text: { content: "1 步" } },
+      ],
     });
     const elements = card.elements as Array<Record<string, unknown>>;
-    expect(elements).toHaveLength(2);
-    expect(elements.at(-1)?.content).toContain("已完成 · 耗时 28.8s");
-    expect(elements.at(-1)?.content).toContain(
-      "模型 火山引擎 (volcengine) · doubao-seed-2-1-turbo-260628 · 推理 medium",
+    expect(elements).toHaveLength(4);
+    expect(elements[0]?.content).toBe("最终答案");
+    expect(elements.at(-1)?.tag).toBe("collapsible_panel");
+    expect(elements.at(-1)?.header).toMatchObject({
+      title: {
+        content: "📊 运行详情 · 已完成 · 耗时 28.8s · 首字节 5.4s",
+      },
+    });
+    const runtimeContent = (
+      elements.at(-1)?.elements as Array<Record<string, unknown>>
+    )[0]?.content;
+    expect(runtimeContent).toContain("**模型**  doubao-seed-2-1-turbo-260628");
+    expect(runtimeContent).toContain(
+      "**提供方**  火山引擎 (volcengine)  ·  **模式**  推理 medium（默认）",
     );
-    expect(elements.at(-1)?.content).toContain(
-      "本轮 ↑ 57,370 ↓ 22 · 上下文 57,370 / 256,000 (22.4%) · 费用 $0.0254",
+    expect(runtimeContent).toContain("**本轮用量**  输入 57,370 · 输出 22");
+    expect(runtimeContent).toContain(
+      "**上下文**  57,370 / 256,000 · 22.4%  ·  **费用**  $0.0254",
     );
   });
 
@@ -135,6 +166,11 @@ describe("native @larksuite/openclaw-lark integration", () => {
         originalData = data;
         return { elements: [{ tag: "markdown", content: "answer" }] };
       },
+      toCardKit2: (card: Record<string, unknown>) => ({
+        schema: "2.0",
+        config: {},
+        body: { elements: card.elements },
+      }),
     };
     class Controller {
       deps = { sessionKey: ctx.sessionKey, accountId: "default" };
@@ -171,6 +207,35 @@ describe("native @larksuite/openclaw-lark integration", () => {
       status: false,
       model: false,
     });
-    expect(card.elements).toHaveLength(2);
+    expect(card.elements).toHaveLength(3);
+    const cardKit = builder.toCardKit2(card);
+    expect(cardKit).toMatchObject({
+      config: { width_mode: "fill", update_multi: true },
+      body: {
+        direction: "vertical",
+        vertical_spacing: "12px",
+        padding: "14px 16px 16px 16px",
+      },
+    });
+  });
+
+  it("captures the first model response byte for the run summary", () => {
+    const registry = new NativeLarkMetricsRegistry();
+    const ctx = {
+      sessionKey: "agent:main:feishu:group:oc_ttfb",
+      messageProvider: "feishu",
+    };
+    registry.captureModelCallEnded(
+      { runId: "run-ttfb", timeToFirstByteMs: 5_420 },
+      ctx,
+    );
+    registry.captureModelCallEnded(
+      { runId: "run-ttfb", timeToFirstByteMs: 8_300 },
+      ctx,
+    );
+    expect(registry.get(ctx.sessionKey)).toMatchObject({
+      runId: "run-ttfb",
+      firstTokenMs: 5_420,
+    });
   });
 });

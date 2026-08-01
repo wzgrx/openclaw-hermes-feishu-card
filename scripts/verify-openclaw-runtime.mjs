@@ -19,6 +19,7 @@ const bridgeHooks = [
   "gateway_stop",
   "llm_output",
   "message_received",
+  "model_call_ended",
   "reply_payload_sending",
 ];
 const embeddedHooks = [
@@ -30,6 +31,7 @@ const embeddedHooks = [
   "gateway_stop",
   "llm_output",
   "message_received",
+  "model_call_ended",
   "reply_payload_sending",
 ];
 const root = resolve(import.meta.dirname, "..");

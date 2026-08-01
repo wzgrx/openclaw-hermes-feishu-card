@@ -47,6 +47,7 @@ describe("OpenClaw plugin entry point", () => {
     }
     expect(hookNames).toEqual([
       "llm_output",
+      "model_call_ended",
       "agent_end",
       "message_received",
       "before_tool_call",
@@ -54,7 +55,7 @@ describe("OpenClaw plugin entry point", () => {
       "reply_payload_sending",
       "gateway_stop",
     ]);
-    expect(on.mock.calls[5]?.[2]).toEqual({ priority: 100 });
+    expect(on.mock.calls[6]?.[2]).toEqual({ priority: 100 });
     expect(info).toHaveBeenCalledWith(
       expect.stringContaining("active for channels: feishu"),
     );
