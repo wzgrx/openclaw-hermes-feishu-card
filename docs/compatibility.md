@@ -25,8 +25,8 @@
 上游通道仍负责媒体传输；本插件会在 Hermes 卡片内附加安全截断后的附件摘要。
 
 飞书 direct dispatcher 不执行跨插件 `reply_payload_sending`。本项目因此以内置依赖
-注册官方通道，并在同一 controller 的终态 builder 中增强卡片；`llm_output` 提供
-Provider、模型、推理档位和逐调用用量，避免从旧 session store 猜测。媒体、审批、
+注册官方通道，并在同一 controller 的终态 builder 中增强卡片；`model_call_ended` 提供
+实际 Provider、模型、API adapter 和传输方式，`llm_output` 提供推理档位和逐调用用量，避免从旧 session store 猜测。媒体、审批、
 按钮、位置、语音以及已经构造的飞书原生卡片保持官方通道投递。路由型普通文本仍
 由 `reply_payload_sending` bridge 处理。
 

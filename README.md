@@ -10,8 +10,8 @@
 
 默认卡片直接沿用迁移前 WSL 中实际运行的官方 Builder：全程不加 Header；等待态
 显示折叠的“等待工具执行”，执行态展开当前工具，完成态依次显示折叠工具面板、
-折叠思考面板、最终回答和原来的两行 Footer。Footer 保留状态、耗时、实际模型、
-Token、缓存与上下文。Provider、费用、推理档位、资源与累计数据继续按真实值采集
+折叠思考面板、最终回答和原来的两行 Footer。Footer 保留状态、耗时、实际
+`provider/model · API adapter`、Token、缓存与上下文。费用、推理档位、资源与累计数据继续按真实值采集
 到内部指标和账本；仅在显式启用对应诊断开关时进入折叠面板。
 
 ![迁移前原版卡片视觉契约](docs/assets/classic-card-preview.png)
@@ -22,8 +22,8 @@ Token、缓存与上下文。Provider、费用、推理档位、资源与累计�
 - CardKit 2.0 全量更新，严格递增 `sequence`，结束时关闭流式状态。
 - 投递失败时保留上游原生文本链路。
 - 工具进度与回答共用卡片，独立进度条默认关闭；媒体、审批、文件、语音继续走原生通道。
-- Provider ID、供应商品牌、请求模型与实际模型在运行数据中分别保存；旧版两行
-  Footer 只显示实际模型，不把路由名或商家名误当模型名。
+- Provider ID、请求模型、实际模型与模型 API adapter 在运行数据中分别保存；旧版两行
+  Footer 显示实际胜出的 `provider/model · API adapter`，不猜测供应商品牌，也不使用路由别名。
 - 上下文使用末次模型调用的真实 Prompt 占用，不使用多工具循环的累计输入量；
   仅有累计值时明确标记为估算。
 - OpenClaw 与 Hermes 可写入同一份追加式 `usage.ndjson`。
@@ -81,7 +81,7 @@ openclaw plugins enable openclaw-hermes-feishu-card
 openclaw plugins doctor
 ```
 
-将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。设置 `embeddedLark: true` 并禁用独立的 `openclaw-lark` 条目；本插件会注册同一套官方通道能力，同时在通道 controller 终态读取 `llm_output` 的实际 Provider、模型、推理档位、Token、缓存、上下文与费用，再把原 Builder 所需字段原样交回旧版两行 Footer。媒体和原生交互卡片仍由官方通道逻辑处理。
+将 [`examples/openclaw.jsonc`](examples/openclaw.jsonc) 合并到 `~/.openclaw/openclaw.json`。设置 `embeddedLark: true` 并禁用独立的 `openclaw-lark` 条目；本插件会注册同一套官方通道能力，同时从 `model_call_ended` 读取实际 Provider、模型与 API adapter，从 `llm_output` 读取推理档位、Token、缓存、上下文与费用，再把原 Builder 所需字段原样交回旧版两行 Footer。媒体和原生交互卡片仍由官方通道逻辑处理。
 
 运行时诊断和自动修复：
 

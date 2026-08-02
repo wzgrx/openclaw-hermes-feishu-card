@@ -17,6 +17,7 @@ import {
 } from "../core/index.js";
 import { resolveFeishuCredentials } from "./credentials.js";
 import { FeishuCardClient } from "./feishu-client.js";
+import { getNativeLarkMetrics } from "./native-lark.js";
 import { normalizeOpenClawUsage } from "./usage.js";
 
 type BeforeToolEvent = {
@@ -380,6 +381,22 @@ export class OpenClawCardBridge {
       route: normalizeRoute(ctx),
     });
     const usage = normalizeOpenClawUsage(event.usageState);
+    const nativeMetrics = getNativeLarkMetrics(
+      event.sessionKey ?? ctx.sessionKey,
+    );
+    const replyRunId = event.runId ?? ctx.runId;
+    if (
+      usage &&
+      nativeMetrics &&
+      (!replyRunId || nativeMetrics.runId === replyRunId)
+    ) {
+      if (nativeMetrics.provider) usage.provider = nativeMetrics.provider;
+      if (nativeMetrics.model) usage.model = nativeMetrics.model;
+      if (nativeMetrics.resolvedRef)
+        usage.resolvedRef = nativeMetrics.resolvedRef;
+      if (nativeMetrics.api) usage.api = nativeMetrics.api;
+      if (nativeMetrics.transport) usage.transport = nativeMetrics.transport;
+    }
     if (event.kind === "final") {
       this.api.logger.info(
         `[openclaw-hermes-feishu-card] final captured key=${key} route=${resolveConversationId(ctx) ?? "missing"} usage=${usage ? "present" : "missing"} resolved=${usage?.resolvedRef ?? "missing"} context=${usage?.contextUsedTokens ?? "missing"}/${usage?.contextTokenBudget ?? "missing"}`,

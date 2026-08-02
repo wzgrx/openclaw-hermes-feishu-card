@@ -19,7 +19,7 @@ flowchart LR
 
 1. 插件在内存中加载并注册锁定版本的官方 `@larksuite/openclaw-lark`；独立的同名插件条目保持禁用，避免重复注册 `feishu` 通道。
 2. 官方 controller 继续负责 WebSocket 入站、流式卡片创建、工具/思考面板、线程回复、媒体和终态关闭。
-3. `llm_output` 按 `sessionKey + runId` 累加每次模型调用，并保留末次调用的真实上下文占用；`agent_end` 补充整轮耗时。
+3. `model_call_ended` 保存实际 Provider、模型、API adapter 与传输方式；`llm_output` 按 `sessionKey + runId` 累加每次模型调用，并保留末次调用的真实上下文占用；`agent_end` 补充整轮耗时。
 4. controller 读取内存中的本轮快照，不再依赖旧版 `sessions.json` 文件位置。
 5. 插件不重排或包装官方 Builder：迁移前与现在锁定的 `2026.7.16` 源文件哈希
    相同。等待/执行/完成元素顺序、5px 面板、无 Header 和两行 Footer 均由原
@@ -59,7 +59,7 @@ Hermes 已原生支持 Feishu/Lark，因此本项目不再运行独立 WebSocket
 
 OpenClaw 运行数据按以下优先级归一化：
 
-- 供应商/模型：使用 `resolvedRef` 的实际胜出路由；`requested` 单独保存，
+- Provider/模型/API：使用 `model_call_ended` 的实际 `provider`、`model`、`api` 与 `transport`，模型引用优先使用 `resolvedRef` 的实际胜出路由；`requested` 单独保存，
   仅在回退或路由变化时显示。
 - 上下文占用：`contextUsedTokens` → 末次调用的
   `input + cacheRead + cacheWrite` → 本轮累计 Prompt。最后一种会标记“估算”。

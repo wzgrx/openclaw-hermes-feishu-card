@@ -7,6 +7,8 @@ export interface UsageSnapshot {
   provider?: string;
   model?: string;
   resolvedRef?: string;
+  api?: string;
+  transport?: string;
   requestedRef?: string;
   reasoningEffort?: string;
   fastMode?: boolean;

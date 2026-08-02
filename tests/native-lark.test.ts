@@ -106,6 +106,16 @@ describe("native @larksuite/openclaw-lark integration", () => {
       },
       ctx,
     );
+    registry.captureModelCallEnded(
+      {
+        runId: "run-patch",
+        provider: "openai",
+        model: "gpt-test",
+        api: "openai-responses",
+        transport: "fetch",
+      },
+      ctx,
+    );
     let originalData: Record<string, unknown> | undefined;
     const originalBuild = (_state: string, data?: Record<string, unknown>) => {
       originalData = data;
@@ -132,7 +142,9 @@ describe("native @larksuite/openclaw-lark integration", () => {
       >;
     expect(metrics).toMatchObject({
       provider: "openai",
-      model: "gpt-test",
+      model: "openai/gpt-test · API openai-responses",
+      api: "openai-responses",
+      transport: "fetch",
       inputTokens: 1_000,
       contextTokens: 10_000,
       accountId: "default",
@@ -283,16 +295,61 @@ describe("native @larksuite/openclaw-lark integration", () => {
       messageProvider: "feishu",
     };
     registry.captureModelCallEnded(
-      { runId: "run-ttfb", timeToFirstByteMs: 5_420 },
+      {
+        runId: "run-ttfb",
+        provider: "volcengine",
+        model: "doubao-seed",
+        api: "openai-completions",
+        transport: "fetch",
+        timeToFirstByteMs: 5_420,
+      },
       ctx,
     );
     registry.captureModelCallEnded(
-      { runId: "run-ttfb", timeToFirstByteMs: 8_300 },
+      {
+        runId: "run-ttfb",
+        provider: "volcengine",
+        model: "doubao-seed",
+        api: "openai-completions",
+        transport: "fetch",
+        timeToFirstByteMs: 8_300,
+      },
       ctx,
     );
     expect(registry.get(ctx.sessionKey)).toMatchObject({
       runId: "run-ttfb",
       firstTokenMs: 5_420,
+      provider: "volcengine",
+      model: "doubao-seed",
+      api: "openai-completions",
+      transport: "fetch",
+    });
+  });
+
+  it("keeps provider/model/API metadata even when TTFB is absent", () => {
+    const registry = new NativeLarkMetricsRegistry();
+    const ctx = {
+      sessionKey: "agent:main:feishu:group:oc_api",
+      messageProvider: "feishu",
+    };
+    registry.captureModelCallEnded(
+      {
+        runId: "run-api",
+        provider: "volcengine",
+        model: "doubao-seed-2-1-turbo-260628",
+        api: "openai-completions",
+        transport: "fetch",
+        contextTokenBudget: 256_000,
+      },
+      ctx,
+    );
+    expect(registry.get(ctx.sessionKey)).toMatchObject({
+      provider: "volcengine",
+      model: "doubao-seed-2-1-turbo-260628",
+      resolvedRef: "volcengine/doubao-seed-2-1-turbo-260628",
+      api: "openai-completions",
+      transport: "fetch",
+      contextTokenBudget: 256_000,
     });
   });
 });

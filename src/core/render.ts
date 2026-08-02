@@ -9,6 +9,7 @@ import type {
   ToolStep,
   UsageTotals,
 } from "./types.js";
+import { formatModelRuntimeIdentity } from "./model-display.js";
 
 const MAX_ANSWER_CHARS = 18_000;
 const MAX_TOOL_STEPS = 20;
@@ -303,9 +304,10 @@ function buildRuntimeFooter(params: {
     primaryEn.push(`Elapsed ${elapsed}`);
     primaryZh.push(`耗时 ${elapsed}`);
   }
-  if (config.footer.model && usage?.model) {
-    primaryEn.push(usage.model);
-    primaryZh.push(usage.model);
+  const modelIdentity = usage ? formatModelRuntimeIdentity(usage) : undefined;
+  if (config.footer.model && modelIdentity) {
+    primaryEn.push(modelIdentity);
+    primaryZh.push(modelIdentity);
   }
 
   const detailEn: string[] = [];

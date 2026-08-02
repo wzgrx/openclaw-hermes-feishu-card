@@ -26,6 +26,9 @@ def test_telemetry_accumulates_canonical_usage() -> None:
         session_id="session",
         provider="openrouter",
         model="qwen",
+        resolved_ref="openrouter/qwen",
+        api="openai-completions",
+        transport="httpx",
         api_duration=0.5,
         usage={
             "input_tokens": 10,
@@ -48,6 +51,9 @@ def test_telemetry_accumulates_canonical_usage() -> None:
     assert usage.output_tokens == 7
     assert usage.total_tokens == 23
     assert usage.duration_ms == 750
+    assert usage.resolved_ref == "openrouter/qwen"
+    assert usage.api == "openai-completions"
+    assert usage.transport == "httpx"
     assert terminal_status == "completed"
     assert error_message == ""
 

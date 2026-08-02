@@ -86,6 +86,18 @@ class TelemetryRegistry:
             usage = entry.usage
             usage.provider = str(kwargs.get("provider") or usage.provider)
             usage.model = str(kwargs.get("response_model") or kwargs.get("model") or usage.model)
+            usage.resolved_ref = str(
+                kwargs.get("resolved_ref")
+                or kwargs.get("resolved_model_ref")
+                or usage.resolved_ref
+            )
+            usage.api = str(
+                kwargs.get("api")
+                or kwargs.get("api_type")
+                or kwargs.get("provider_api")
+                or usage.api
+            )
+            usage.transport = str(kwargs.get("transport") or usage.transport)
             usage.input_tokens += _number(raw_usage.get("input_tokens"))
             usage.output_tokens += _number(raw_usage.get("output_tokens"))
             usage.cache_read_tokens += _number(raw_usage.get("cache_read_tokens"))

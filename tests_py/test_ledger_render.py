@@ -100,6 +100,8 @@ def test_render_card_has_cardkit_v2_panels(tmp_path) -> None:
     session.usage = UsageSnapshot(
         provider="volcengine",
         model="doubao-seed",
+        resolved_ref="volcengine/doubao-seed",
+        api="openai-completions",
         input_tokens=1200,
         output_tokens=300,
         total_tokens=1500,
@@ -196,6 +198,28 @@ def test_completed_card_matches_legacy_visual_contract(tmp_path) -> None:
             "en_us": "Completed · Elapsed 1m 1s · deepseek-v4\n↑ 1.2k ↓ 300 · Cache 0/0 (0%) · Context 2.0k/128k (2%)",
         },
     }
+
+
+def test_completed_footer_uses_exact_provider_model_and_api(tmp_path) -> None:
+    config = HermesCardConfig.from_extra({"card_footer": {"storage_dir": str(tmp_path)}})
+    session = CardSession(
+        id="identity",
+        route_key="chat",
+        chat_id="chat",
+        reply_to=None,
+        metadata=None,
+    )
+    session.set_answer("done")
+    session.usage = UsageSnapshot(
+        provider="volcengine",
+        model="doubao-seed",
+        resolved_ref="volcengine/doubao-seed",
+        api="openai-completions",
+    )
+    session.finish()
+
+    card = render_card(session, UsageTotals(), config, now=session.updated_at)
+    assert "volcengine/doubao-seed · API openai-completions" in str(card)
 
 
 def test_render_card_enforces_size_and_table_limits(tmp_path) -> None:

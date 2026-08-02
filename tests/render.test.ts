@@ -37,6 +37,7 @@ describe("renderCard", () => {
       provider: "deepseek",
       model: "deepseek-v4",
       resolvedRef: "deepseek/deepseek-v4",
+      api: "openai-completions",
       requestedRef: "router/auto",
       fallbackUsed: true,
       reasoningEffort: "high",
@@ -110,7 +111,9 @@ describe("renderCard", () => {
     expect(serialized).toContain("🛠️ 执行耗时 0.5s");
     expect(serialized).toContain("💭 思考");
     expect(serialized).toContain("Diagnostics");
-    expect(serialized).toContain("deepseek-v4");
+    expect(serialized).toContain(
+      "deepseek/deepseek-v4 · API openai-completions",
+    );
     expect(serialized).toContain("模型路由");
     expect(serialized).toContain("router/auto");
     expect(serialized).toContain("末次模型调用");

@@ -12,7 +12,10 @@ import { fileURLToPath } from "node:url";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { resolveThinkingDefault } from "openclaw/plugin-sdk/agent-runtime";
 
-import type { CardFooterConfig } from "../core/index.js";
+import {
+  formatModelRuntimeIdentity,
+  type CardFooterConfig,
+} from "../core/index.js";
 
 interface TokenUsage {
   input?: number;
@@ -27,6 +30,8 @@ interface LlmOutputEvent {
   provider: string;
   model: string;
   resolvedRef?: string;
+  api?: string;
+  transport?: string;
   contextTokenBudget?: number;
   reasoningEffort?: string;
   reasoningEffortDefault?: boolean;
@@ -37,6 +42,11 @@ interface LlmOutputEvent {
 
 interface ModelCallEndedEvent {
   runId: string;
+  provider: string;
+  model: string;
+  api?: string;
+  transport?: string;
+  contextTokenBudget?: number;
   timeToFirstByteMs?: number;
 }
 
@@ -60,6 +70,8 @@ export interface NativeLarkMetrics {
   provider?: string | undefined;
   model?: string | undefined;
   resolvedRef?: string | undefined;
+  api?: string | undefined;
+  transport?: string | undefined;
   reasoningEffort?: string | undefined;
   reasoningEffortDefault?: boolean | undefined;
   fastMode?: boolean | undefined;
@@ -93,6 +105,8 @@ interface NativeFooterMetrics {
   __openclawHermesFeishuCard?: true;
   provider?: string | undefined;
   resolvedRef?: string | undefined;
+  api?: string | undefined;
+  transport?: string | undefined;
   reasoningEffort?: string | undefined;
   reasoningEffortDefault?: boolean | undefined;
   fastMode?: boolean | undefined;
@@ -283,6 +297,8 @@ export class NativeLarkMetricsRegistry {
     current.provider = event.provider || current.provider;
     current.model = event.model || current.model;
     current.resolvedRef = event.resolvedRef ?? current.resolvedRef;
+    current.api = event.api ?? current.api;
+    current.transport = event.transport ?? current.transport;
     current.reasoningEffort = event.reasoningEffort ?? current.reasoningEffort;
     current.reasoningEffortDefault =
       event.reasoningEffortDefault ?? current.reasoningEffortDefault;
@@ -306,10 +322,6 @@ export class NativeLarkMetricsRegistry {
     if (!sessionKey) {
       return;
     }
-    const timeToFirstByteMs = finite(event.timeToFirstByteMs);
-    if (timeToFirstByteMs === undefined) {
-      return;
-    }
     this.prune();
     const previous = this.entries.get(sessionKey);
     const current =
@@ -325,7 +337,22 @@ export class NativeLarkMetricsRegistry {
             totalTokens: 0,
             updatedAt: Date.now(),
           };
-    current.firstTokenMs ??= timeToFirstByteMs;
+    const timeToFirstByteMs = finite(event.timeToFirstByteMs);
+    if (timeToFirstByteMs !== undefined) {
+      current.firstTokenMs ??= timeToFirstByteMs;
+    }
+    current.provider = event.provider || current.provider;
+    current.model = event.model || current.model;
+    current.resolvedRef =
+      event.provider && event.model
+        ? `${event.provider}/${event.model}`
+        : current.resolvedRef;
+    current.api = event.api ?? current.api;
+    current.transport = event.transport ?? current.transport;
+    current.contextTokenBudget =
+      finite(event.contextTokenBudget) ??
+      finite(ctx.contextTokenBudget) ??
+      current.contextTokenBudget;
     current.updatedAt = Date.now();
     this.entries.set(sessionKey, current);
   }
@@ -368,6 +395,12 @@ function sharedNativeMetricsRegistry(): NativeLarkMetricsRegistry {
   return store.__openclawHermesFeishuCardNativeMetrics;
 }
 
+export function getNativeLarkMetrics(
+  sessionKey: string | undefined,
+): NativeLarkMetrics | undefined {
+  return sharedNativeMetricsRegistry().get(sessionKey);
+}
+
 function asFooterMetrics(
   entry: NativeLarkMetrics,
   accountId?: string,
@@ -381,9 +414,11 @@ function asFooterMetrics(
     totalTokens: entry.contextUsedTokens,
     totalTokensFresh: entry.contextUsedTokens !== undefined,
     contextTokens: entry.contextTokenBudget,
-    model: entry.model,
+    model: formatModelRuntimeIdentity(entry),
     provider: entry.provider,
     resolvedRef: entry.resolvedRef,
+    api: entry.api,
+    transport: entry.transport,
     reasoningEffort: entry.reasoningEffort,
     reasoningEffortDefault: entry.reasoningEffortDefault,
     fastMode: entry.fastMode,
@@ -593,6 +628,17 @@ function configuredThinkingEffort(
   }
 }
 
+function configuredProviderApi(
+  api: OpenClawPluginApi,
+  provider: string | undefined,
+): string | undefined {
+  const key = provider?.trim();
+  if (!key) return undefined;
+  const providers = record(record(api.config).models).providers;
+  const value = record(record(providers)[key]).api;
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
 export class NativeLarkIntegration {
   readonly registry = sharedNativeMetricsRegistry();
 
@@ -623,7 +669,21 @@ export class NativeLarkIntegration {
       }
     });
     this.api.on("model_call_ended", (event, ctx) => {
-      this.registry.captureModelCallEnded(event, ctx);
+      const providerApi =
+        event.api ?? configuredProviderApi(this.api, event.provider);
+      this.registry.captureModelCallEnded(
+        {
+          ...event,
+          ...(providerApi ? { api: providerApi } : {}),
+        },
+        ctx,
+      );
+      const entry = this.registry.get(ctx.sessionKey);
+      if (entry?.runId === event.runId) {
+        this.api.logger.info(
+          `[openclaw-hermes-feishu-card] model transport captured provider=${entry.provider ?? "-"} model=${entry.model ?? "-"} api=${entry.api ?? "-"} transport=${entry.transport ?? "-"}`,
+        );
+      }
     });
     this.api.on("agent_end", (event, ctx) => {
       this.registry.finish(event, ctx);

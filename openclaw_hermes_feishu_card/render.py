@@ -262,9 +262,16 @@ def _footer(session: CardSession, config: HermesCardConfig, now: int) -> dict[st
         elapsed = _duration(usage.duration_ms or (session.completed_at or now) - session.started_at)
         primary_en.append(f"Elapsed {elapsed}")
         primary_zh.append(f"耗时 {elapsed}")
-    if footer.model and usage.model:
-        primary_en.append(usage.model)
-        primary_zh.append(usage.model)
+    identity = usage.resolved_ref or (
+        usage.model
+        if not usage.provider or usage.model.lower().startswith(f"{usage.provider.lower()}/")
+        else f"{usage.provider}/{usage.model}"
+    )
+    if identity and usage.api:
+        identity = f"{identity} · API {usage.api}"
+    if footer.model and identity:
+        primary_en.append(identity)
+        primary_zh.append(identity)
 
     detail_en: list[str] = []
     detail_zh: list[str] = []

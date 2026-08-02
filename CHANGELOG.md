@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Source the visible model identity from OpenClaw's resolved model-call hooks and
+  show the exact `provider/model · API adapter` in the classic footer; retain
+  transport metadata without guessing a vendor brand from the provider ID.
+
 - Restore the exact CardKit renderer that was installed in WSL immediately
   before migration: no added header, a collapsed waiting-tool panel, an
   expanded active-tool panel, separate collapsed tool/reasoning panels on

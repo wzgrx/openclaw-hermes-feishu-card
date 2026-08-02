@@ -17,6 +17,9 @@ def now_ms() -> int:
 class UsageSnapshot:
     provider: str = ""
     model: str = ""
+    resolved_ref: str = ""
+    api: str = ""
+    transport: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
