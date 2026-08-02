@@ -1,5 +1,7 @@
 # Feishu CardKit for OpenClaw and Hermes
 
+[Architecture](docs/architecture.md) · [Configuration](docs/configuration.md) · [Compatibility](docs/compatibility.md) · [Roadmap](docs/roadmap.md) · [Maintenance](docs/maintenance.md)
+
 A hybrid repository with two native integrations and one official CLI verification transport:
 
 - A TypeScript OpenClaw plugin that registers a version-pinned official Feishu channel, enriches its channel-owned streaming card lifecycle, and retains public reply hooks for routed text delivery.

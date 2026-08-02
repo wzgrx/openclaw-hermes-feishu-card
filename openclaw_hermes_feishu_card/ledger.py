@@ -44,6 +44,9 @@ class UsageLedger:
             "usage": {
                 "provider": usage.provider,
                 "model": usage.model,
+                "resolvedRef": usage.resolved_ref,
+                "api": usage.api,
+                "transport": usage.transport,
                 "inputTokens": usage.input_tokens,
                 "outputTokens": usage.output_tokens,
                 "cacheReadTokens": usage.cache_read_tokens,

@@ -57,6 +57,26 @@ describe("CardSession", () => {
     expect(session.snapshot().reasoning).toBe("check assumptions");
     expect(session.snapshot().answer).toBe("Result");
   });
+
+  it("settles an unfinished tool when the run terminates", () => {
+    const session = new CardSession({
+      id: "session-terminal",
+      runtime: "openclaw",
+      now: 1_000,
+    });
+    session.startTool({ id: "tool-running", name: "shell", now: 1_100 });
+    session.finish("aborted", 1_500);
+
+    expect(session.snapshot().tools).toEqual([
+      expect.objectContaining({
+        id: "tool-running",
+        status: "failed",
+        finishedAt: 1_500,
+        durationMs: 400,
+        error: "run stopped",
+      }),
+    ]);
+  });
 });
 
 describe("SessionRegistry", () => {

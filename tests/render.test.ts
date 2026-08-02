@@ -278,9 +278,49 @@ describe("renderCard", () => {
     expect(Buffer.byteLength(JSON.stringify(card), "utf8")).toBeLessThanOrEqual(
       MAX_CARD_JSON_BYTES,
     );
-    const separatorCount = contents
-      .flatMap((content) => content.split("\n"))
-      .filter((line) => /^\| --- \| --- \|$/.test(line)).length;
+    const separatorCount = contents.reduce(
+      (total, content) => total + countRenderedTableSeparators(content),
+      0,
+    );
     expect(separatorCount).toBeLessThanOrEqual(MAX_CARD_TABLES);
   });
+
+  it("does not spend the table budget on fenced code examples", () => {
+    const session = new CardSession({ id: "tables", runtime: "openclaw" });
+    const table = "| A | B |\n| --- | --- |\n| 1 | 2 |";
+    session.applyReply(
+      "final",
+      `\`\`\`markdown\n${table}\n\`\`\`\n\n${[table, table, table].join("\n\n")}`,
+    );
+    const card = renderCard({
+      session: session.snapshot(),
+      config: resolveConfig({ storageDir: "./tmp-test" }),
+      totals: {
+        todayTokens: 0,
+        monthTokens: 0,
+        allTimeTokens: 0,
+        todayCost: 0,
+        monthCost: 0,
+        allTimeCost: 0,
+      },
+    });
+    const answer = (
+      card.body as { elements: Array<Record<string, unknown>> }
+    ).elements.find((element) => element.content?.toString().includes("| A"));
+
+    expect(countRenderedTableSeparators(String(answer?.content))).toBe(3);
+  });
 });
+
+function countRenderedTableSeparators(content: string): number {
+  let fenced = false;
+  let count = 0;
+  for (const line of content.split("\n")) {
+    if (line.trimStart().startsWith("```")) {
+      fenced = !fenced;
+    } else if (!fenced && /^\| --- \| --- \|$/.test(line)) {
+      count += 1;
+    }
+  }
+  return count;
+}

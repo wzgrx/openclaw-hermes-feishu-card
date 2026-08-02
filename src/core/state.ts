@@ -233,6 +233,18 @@ export class CardSession {
   }
 
   finish(status: Exclude<CardStatus, "running">, now = Date.now()): void {
+    for (const [id, step] of this.tools) {
+      if (step.status !== "running") continue;
+      this.tools.set(id, {
+        ...step,
+        status: status === "completed" ? "completed" : "failed",
+        finishedAt: now,
+        durationMs: Math.max(0, now - step.startedAt),
+        ...(status === "completed"
+          ? {}
+          : { error: status === "failed" ? "run failed" : "run stopped" }),
+      });
+    }
     this.status = status;
     this.completedAt = now;
     this.touch(now);

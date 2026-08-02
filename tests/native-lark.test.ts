@@ -11,7 +11,10 @@ import {
   createOfficialPluginApi,
   NativeLarkIntegration,
   NativeLarkMetricsRegistry,
+  type NativeToolTraceModule,
   patchNativeLarkModules,
+  patchNativeToolTraceModule,
+  prepareOfficialCommonJsShadow,
 } from "../src/openclaw/native-lark.js";
 
 describe("native @larksuite/openclaw-lark integration", () => {
@@ -351,6 +354,80 @@ describe("native @larksuite/openclaw-lark integration", () => {
       transport: "fetch",
       contextTokenBudget: 256_000,
     });
+  });
+
+  it("aliases hook tool traces to the active dispatcher session", () => {
+    const traces = new Map<string, Array<Record<string, unknown>>>();
+    const toolTrace: NativeToolTraceModule = {
+      startToolUseTraceRun(sessionKey) {
+        traces.set(sessionKey, []);
+      },
+      clearToolUseTraceRun(sessionKey) {
+        traces.delete(sessionKey);
+      },
+      hasToolUseTraceRun(sessionKey) {
+        return Boolean(sessionKey && traces.has(sessionKey));
+      },
+      recordToolUseStart(params) {
+        if (!params.sessionKey) return;
+        traces.get(params.sessionKey)?.push({ ...params, status: "running" });
+      },
+      recordToolUseEnd(params) {
+        if (!params.sessionKey) return;
+        const steps = traces.get(params.sessionKey);
+        const step = steps?.find((value) => value.runId === params.runId);
+        if (step) Object.assign(step, params, { status: "success" });
+      },
+      getToolUseTraceSteps(sessionKey) {
+        return sessionKey ? (traces.get(sessionKey) ?? []) : [];
+      },
+    };
+    patchNativeToolTraceModule(toolTrace);
+
+    const dispatcherKey = "agent:main:main";
+    const hookKey = "agent:main:feishu:default:group:oc_fixture";
+    toolTrace.startToolUseTraceRun(dispatcherKey);
+    toolTrace.recordToolUseStart({
+      sessionKey: hookKey,
+      toolName: "shell",
+      runId: "run-tool",
+    });
+    toolTrace.recordToolUseEnd({
+      sessionKey: hookKey,
+      toolName: "shell",
+      runId: "run-tool",
+      result: "ok",
+    });
+
+    expect(toolTrace.getToolUseTraceSteps(dispatcherKey)).toEqual([
+      expect.objectContaining({
+        sessionKey: dispatcherKey,
+        toolName: "shell",
+        runId: "run-tool",
+        result: "ok",
+        status: "success",
+      }),
+    ]);
+    expect(toolTrace.getToolUseTraceSteps(hookKey)).toEqual([]);
+  });
+
+  it("releases the official reply reservation on failed dispatches", () => {
+    const entry = fileURLToPath(
+      import.meta.resolve("@larksuite/openclaw-lark"),
+    );
+    const root = path.dirname(path.dirname(entry));
+    const shadow = prepareOfficialCommonJsShadow(root);
+    const dispatch = readFileSync(
+      path.join(shadow, "src", "messaging", "inbound", "dispatch.js"),
+      "utf8",
+    );
+
+    expect(dispatch).toContain(
+      "openclaw-hermes-feishu-card: always release reply reservation",
+    );
+    expect(dispatch).toMatch(
+      /finally \{[\s\S]*markFullyComplete\(\);[\s\S]*markDispatchIdle\(\);[\s\S]*unregisterActiveDispatcher/,
+    );
   });
 });
 

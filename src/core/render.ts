@@ -14,20 +14,57 @@ import { formatModelRuntimeIdentity } from "./model-display.js";
 const MAX_ANSWER_CHARS = 18_000;
 const MAX_TOOL_STEPS = 20;
 export const MAX_CARD_JSON_BYTES = 28 * 1024;
-export const MAX_CARD_TABLES = 5;
+export const MAX_CARD_TABLES = 3;
 
 type CardElement = Record<string, unknown>;
 
-const TABLE_SEPARATOR = /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+(?:\s*:?-{3,}:?\s*)$/gm;
+interface MarkdownTableMatch {
+  index: number;
+  length: number;
+  raw: string;
+}
+
+function findMarkdownTablesOutsideCodeBlocks(
+  content: string,
+): MarkdownTableMatch[] {
+  const codeBlockRanges = [...content.matchAll(/```[\s\S]*?```/g)].map(
+    (match) => ({
+      start: match.index,
+      end: match.index + match[0].length,
+    }),
+  );
+  const insideCodeBlock = (index: number): boolean =>
+    codeBlockRanges.some((range) => index >= range.start && index < range.end);
+  const tables: MarkdownTableMatch[] = [];
+  const tablePattern = /\|.+\|[\r\n]+\|[-:| ]+\|[\s\S]*?(?=\n\n|\n(?!\|)|$)/g;
+  for (const match of content.matchAll(tablePattern)) {
+    if (!insideCodeBlock(match.index)) {
+      tables.push({
+        index: match.index,
+        length: match[0].length,
+        raw: match[0],
+      });
+    }
+  }
+  return tables;
+}
 
 function limitMarkdownTables(
   content: string,
-  state: { count: number },
+  state: { remaining: number },
 ): string {
-  return content.replace(TABLE_SEPARATOR, (line) => {
-    state.count += 1;
-    return state.count <= MAX_CARD_TABLES ? line : `\\${line}`;
-  });
+  const tables = findMarkdownTablesOutsideCodeBlocks(content);
+  const keepCount = Math.max(0, state.remaining);
+  state.remaining = Math.max(0, state.remaining - tables.length);
+  if (tables.length <= keepCount) return content;
+
+  let result = content;
+  for (let index = tables.length - 1; index >= keepCount; index -= 1) {
+    const table = tables[index];
+    if (!table) continue;
+    result = `${result.slice(0, table.index)}\`\`\`\n${table.raw}\n\`\`\`${result.slice(table.index + table.length)}`;
+  }
+  return result;
 }
 
 function truncateUtf8(content: string, byteLimit: number): string {
@@ -62,9 +99,11 @@ function fitCardByteBudget(card: CardJson): CardJson {
     for (const child of Object.values(element)) visit(child);
   };
   visit(card);
-  const tableState = { count: 0 };
+  const tableState = { remaining: MAX_CARD_TABLES };
   for (const node of textNodes) {
-    node.content = limitMarkdownTables(String(node.content), tableState);
+    if (node.tag === "markdown" || node.tag === "lark_md") {
+      node.content = limitMarkdownTables(String(node.content), tableState);
+    }
   }
 
   let bytes = Buffer.byteLength(JSON.stringify(card), "utf8");

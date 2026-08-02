@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Bridge OpenClaw tool-hook session keys to the active official dispatcher
+  trace so real tool steps populate the classic tool panel instead of being
+  lost across the two session-key formats.
+- Release the embedded official reply dispatcher reservation from `finally`
+  on both success and failure, preventing one failed run from blocking later
+  messages in the same chat.
+- Align routed TypeScript and Hermes cards with CardKit's three-table streaming
+  budget, ignore fenced examples, and wrap overflow tables as readable code.
+- Preserve Hermes `resolvedRef`, model API adapter and transport in the shared
+  usage ledger, and settle unfinished tool rows when a run terminates.
+- Add a GitHub comparison audit and prioritized roadmap that separates
+  capabilities inherited from the official channel from project-owned gaps.
 - Source the visible model identity from OpenClaw's resolved model-call hooks and
   show the exact `provider/model · API adapter` in the classic footer; retain
   transport metadata without guessing a vendor brand from the provider ID.

@@ -151,6 +151,26 @@ interface NativeControllerModule extends UnknownRecord {
   };
 }
 
+interface NativeToolTraceParams {
+  sessionKey?: string;
+  toolName: string;
+  toolParams?: Record<string, unknown>;
+  toolCallId?: string;
+  runId?: string;
+  result?: unknown;
+  error?: string;
+  durationMs?: number;
+}
+
+export interface NativeToolTraceModule extends UnknownRecord {
+  startToolUseTraceRun: (sessionKey: string) => void;
+  clearToolUseTraceRun: (sessionKey: string) => void;
+  hasToolUseTraceRun: (sessionKey?: string) => boolean;
+  recordToolUseStart: (params: NativeToolTraceParams) => void;
+  recordToolUseEnd: (params: NativeToolTraceParams) => void;
+  getToolUseTraceSteps: (sessionKey?: string) => unknown[];
+}
+
 interface NativePatchState {
   registry: NativeLarkMetricsRegistry;
   config: CardFooterConfig;
@@ -168,7 +188,11 @@ const PATCH_STATE = Symbol.for(
 const PATCHED_CONTROLLER = Symbol.for(
   "openclaw-hermes-feishu-card.native-lark-controller-patched",
 );
+const PATCHED_TOOL_TRACE = Symbol.for(
+  "openclaw-hermes-feishu-card.native-lark-tool-trace-patched",
+);
 const TEN_MINUTES_MS = 10 * 60 * 1_000;
+const OFFICIAL_SHADOW_REVISION = "2";
 
 interface NativeMetricsGlobal {
   __openclawHermesFeishuCardNativeMetrics?: NativeLarkMetricsRegistry;
@@ -448,15 +472,16 @@ function packageRoot(entry: string): string {
   throw new Error(`@larksuite/openclaw-lark root not found from ${entry}`);
 }
 
-function prepareOfficialCommonJsShadow(root: string): string {
+export function prepareOfficialCommonJsShadow(root: string): string {
   const manifest = JSON.parse(
     readFileSync(path.join(root, "package.json"), "utf8"),
   ) as UnknownRecord & { version?: string };
   const version = String(manifest.version ?? "unknown");
   const shadow = path.join(root, `.openclaw-hermes-feishu-card-cjs-${version}`);
   const marker = path.join(shadow, ".ready");
+  const markerValue = `${version}:${OFFICIAL_SHADOW_REVISION}`;
   try {
-    if (readFileSync(marker, "utf8") === version) {
+    if (readFileSync(marker, "utf8") === markerValue) {
       return shadow;
     }
   } catch {
@@ -499,13 +524,41 @@ function prepareOfficialCommonJsShadow(root: string): string {
   }
   writeFileSync(tokenStorePath, tokenStore);
   writeFileSync(versionPath, versionSource);
-  writeFileSync(marker, version);
+  patchOfficialDispatcherCompletion(shadow);
+  writeFileSync(marker, markerValue);
   return shadow;
+}
+
+function patchOfficialDispatcherCompletion(root: string): void {
+  const dispatchPath = path.join(
+    root,
+    "src",
+    "messaging",
+    "inbound",
+    "dispatch.js",
+  );
+  const source = readFileSync(dispatchPath, "utf8");
+  const marker =
+    "// openclaw-hermes-feishu-card: always release reply reservation";
+  if (source.includes(marker)) return;
+  const target =
+    /(\s+finally \{\r?\n)(\s+)(\(0, chat_queue_1\.unregisterActiveDispatcher\)\(queueKey\);)/;
+  const patched = source.replace(
+    target,
+    `$1$2${marker}\n$2markFullyComplete();\n$2markDispatchIdle();\n$2$3`,
+  );
+  if (patched === source) {
+    throw new Error(
+      "unsupported @larksuite/openclaw-lark dispatch completion format",
+    );
+  }
+  writeFileSync(dispatchPath, patched);
 }
 
 function loadOfficialSourceModules(root: string): {
   builder: NativeBuilderModule;
   controller: NativeControllerModule;
+  toolTrace: NativeToolTraceModule;
   official: OfficialPluginDefinition;
 } {
   const builder = require(
@@ -514,14 +567,93 @@ function loadOfficialSourceModules(root: string): {
   const controller = require(
     path.join(root, "src", "card", "streaming-card-controller.js"),
   ) as NativeControllerModule;
+  const toolTrace = require(
+    path.join(root, "src", "card", "tool-use-trace-store.js"),
+  ) as NativeToolTraceModule;
   const officialModule = require(path.join(root, "index.js")) as {
     default?: OfficialPluginDefinition;
   } & OfficialPluginDefinition;
   return {
     builder,
     controller,
+    toolTrace,
     official: officialModule.default ?? officialModule,
   };
+}
+
+function agentScope(sessionKey: string | undefined): string | undefined {
+  const match = sessionKey
+    ?.trim()
+    .toLowerCase()
+    .match(/^agent:([^:]+):/);
+  return match?.[1];
+}
+
+export function patchNativeToolTraceModule(
+  toolTrace: NativeToolTraceModule,
+): void {
+  const patched = toolTrace as NativeToolTraceModule & {
+    [PATCHED_TOOL_TRACE]?: {
+      activeKeys: Set<string>;
+      runKeys: Map<string, string>;
+    };
+  };
+  if (patched[PATCHED_TOOL_TRACE]) return;
+
+  const state = {
+    activeKeys: new Set<string>(),
+    runKeys: new Map<string, string>(),
+  };
+  const originalStart = toolTrace.startToolUseTraceRun;
+  const originalClear = toolTrace.clearToolUseTraceRun;
+  const originalRecordStart = toolTrace.recordToolUseStart;
+  const originalRecordEnd = toolTrace.recordToolUseEnd;
+
+  const resolveKey = (params: NativeToolTraceParams): string | undefined => {
+    const supplied = params.sessionKey?.trim();
+    if (supplied && toolTrace.hasToolUseTraceRun(supplied)) return supplied;
+    if (params.runId) {
+      const bound = state.runKeys.get(params.runId);
+      if (bound && toolTrace.hasToolUseTraceRun(bound)) return bound;
+    }
+    const scope = agentScope(supplied);
+    const candidates = [...state.activeKeys].filter(
+      (key) => toolTrace.hasToolUseTraceRun(key) && agentScope(key) === scope,
+    );
+    const resolved = candidates.at(-1) ?? supplied;
+    if (resolved && params.runId && toolTrace.hasToolUseTraceRun(resolved)) {
+      state.runKeys.set(params.runId, resolved);
+    }
+    return resolved;
+  };
+
+  toolTrace.startToolUseTraceRun = (sessionKey) => {
+    state.activeKeys.delete(sessionKey);
+    state.activeKeys.add(sessionKey);
+    originalStart(sessionKey);
+  };
+  toolTrace.clearToolUseTraceRun = (sessionKey) => {
+    state.activeKeys.delete(sessionKey);
+    for (const [runId, key] of state.runKeys) {
+      if (key === sessionKey) state.runKeys.delete(runId);
+    }
+    originalClear(sessionKey);
+  };
+  toolTrace.recordToolUseStart = (params) => {
+    const sessionKey = resolveKey(params);
+    originalRecordStart({
+      ...params,
+      ...(sessionKey ? { sessionKey } : {}),
+    });
+  };
+  toolTrace.recordToolUseEnd = (params) => {
+    const sessionKey = resolveKey(params);
+    originalRecordEnd({
+      ...params,
+      ...(sessionKey ? { sessionKey } : {}),
+    });
+  };
+  patched[PATCHED_TOOL_TRACE] = state;
 }
 
 export function createOfficialPluginApi(
@@ -714,6 +846,7 @@ export class NativeLarkIntegration {
         config: this.config,
         logInfo: (message) => this.api.logger.info(message),
       });
+      patchNativeToolTraceModule(officialSource.toolTrace);
       const official = officialSource.official;
       if (typeof official.register !== "function") {
         throw new Error("official plugin register() export is missing");

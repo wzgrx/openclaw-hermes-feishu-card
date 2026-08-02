@@ -10,20 +10,26 @@ from .models import CardSession, LegacyRuntimeSnapshot, ResourceSnapshot, ToolSt
 MAX_ANSWER_CHARS = 18_000
 MAX_TOOL_STEPS = 20
 MAX_CARD_JSON_BYTES = 28 * 1024
-MAX_CARD_TABLES = 5
-_TABLE_SEPARATOR = re.compile(
-    r"^\s*\|?(?:\s*:?-{3,}:?\s*\|)+(?:\s*:?-{3,}:?\s*)$",
-    re.MULTILINE,
-)
+MAX_CARD_TABLES = 3
+_CODE_BLOCK = re.compile(r"```[\s\S]*?```")
+_MARKDOWN_TABLE = re.compile(r"\|.+\|[\r\n]+\|[-:| ]+\|[\s\S]*?(?=\n\n|\n(?!\|)|$)")
 
 
 def _limit_markdown_tables(content: str, state: list[int]) -> str:
-    def replace(match: re.Match[str]) -> str:
-        state[0] += 1
-        line = match.group(0)
-        return line if state[0] <= MAX_CARD_TABLES else f"\\{line}"
-
-    return _TABLE_SEPARATOR.sub(replace, content)
+    code_ranges = [(match.start(), match.end()) for match in _CODE_BLOCK.finditer(content)]
+    tables = [
+        match
+        for match in _MARKDOWN_TABLE.finditer(content)
+        if not any(start <= match.start() < end for start, end in code_ranges)
+    ]
+    keep_count = max(0, state[0])
+    state[0] = max(0, state[0] - len(tables))
+    if len(tables) <= keep_count:
+        return content
+    result = content
+    for match in reversed(tables[keep_count:]):
+        result = f"{result[: match.start()]}```\n{match.group(0)}\n```{result[match.end() :]}"
+    return result
 
 
 def _truncate_utf8(content: str, byte_limit: int) -> str:
@@ -55,9 +61,10 @@ def _fit_card_byte_budget(card: dict[str, Any]) -> dict[str, Any]:
                 visit(child)
 
     visit(card)
-    table_state = [0]
+    table_state = [MAX_CARD_TABLES]
     for node in text_nodes:
-        node["content"] = _limit_markdown_tables(str(node["content"]), table_state)
+        if node.get("tag") in {"markdown", "lark_md"}:
+            node["content"] = _limit_markdown_tables(str(node["content"]), table_state)
     encoded_size = len(json.dumps(card, ensure_ascii=False, separators=(",", ":")).encode())
     while encoded_size > MAX_CARD_JSON_BYTES:
         candidates = [

@@ -72,6 +72,41 @@ def test_ledger_aggregates_day_month_and_all_time(tmp_path) -> None:
     assert totals.currency == "USD"
 
 
+def test_ledger_preserves_resolved_model_api_identity(tmp_path) -> None:
+    ledger = UsageLedger(tmp_path, "UTC")
+    assert ledger.append(
+        "hermes",
+        "identity",
+        UsageSnapshot(
+            provider="volcengine",
+            model="doubao-seed",
+            resolved_ref="volcengine/doubao-seed",
+            api="openai-completions",
+            transport="fetch",
+        ),
+        1_000,
+    )
+
+    record = json.loads((tmp_path / "usage.ndjson").read_text(encoding="utf-8"))
+    assert record["usage"] == {
+        "provider": "volcengine",
+        "model": "doubao-seed",
+        "resolvedRef": "volcengine/doubao-seed",
+        "api": "openai-completions",
+        "transport": "fetch",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "totalTokens": 0,
+        "contextUsedTokens": 0,
+        "contextTokenBudget": 0,
+        "durationMs": 0,
+        "turnCost": None,
+        "currency": None,
+    }
+
+
 def test_render_card_has_cardkit_v2_panels(tmp_path) -> None:
     config = HermesCardConfig.from_extra(
         {
@@ -258,5 +293,36 @@ def test_render_card_enforces_size_and_table_limits(tmp_path) -> None:
                 visit(child)
 
     visit(card)
-    separator_count = sum(line == "| --- | --- |" for content in markdown_contents for line in content.splitlines())
+    separator_count = sum(_count_rendered_table_separators(content) for content in markdown_contents)
     assert separator_count <= MAX_CARD_TABLES
+
+
+def test_render_card_ignores_fenced_table_examples_for_budget(tmp_path) -> None:
+    config = HermesCardConfig.from_extra({"card_footer": {"storage_dir": str(tmp_path)}})
+    session = CardSession(
+        id="tables",
+        route_key="chat",
+        chat_id="chat",
+        reply_to=None,
+        metadata=None,
+    )
+    table = "| A | B |\n| --- | --- |\n| 1 | 2 |"
+    session.set_answer(f"```markdown\n{table}\n```\n\n" + "\n\n".join([table] * 3))
+    card = render_card(session, UsageTotals(), config)
+    answer = next(
+        element["content"]
+        for element in card["body"]["elements"]
+        if element.get("tag") == "markdown" and "| A" in element.get("content", "")
+    )
+    assert _count_rendered_table_separators(answer) == 3
+
+
+def _count_rendered_table_separators(content: str) -> int:
+    fenced = False
+    count = 0
+    for line in content.splitlines():
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+        elif not fenced and line == "| --- | --- |":
+            count += 1
+    return count

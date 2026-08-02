@@ -1,6 +1,6 @@
 # OpenClaw / Hermes 飞书 CardKit 插件
 
-[English](README.en.md) · [架构](docs/architecture.md) · [配置](docs/configuration.md) · [兼容性](docs/compatibility.md) · [维护](docs/maintenance.md) · [迁移](docs/migration.md)
+[English](README.en.md) · [架构](docs/architecture.md) · [配置](docs/configuration.md) · [兼容性](docs/compatibility.md) · [路线图](docs/roadmap.md) · [维护](docs/maintenance.md) · [迁移](docs/migration.md)
 
 一个仓库、两套原生集成和一条官方 CLI 验证链路：
 
@@ -219,6 +219,10 @@ docs/                           架构、迁移、兼容与测试说明
 - [larksuite/node-sdk](https://github.com/larksuite/node-sdk)：官方 CardKit/IM 类型与应用鉴权
 - [ET06731/opencode-im-bridge](https://github.com/ET06731/opencode-im-bridge)：串行 CardKit 生命周期、Token 失效重试和本地链接清理思路
 - [zeno528/openclaw-lark-streaming-patch](https://github.com/zeno528/openclaw-lark-streaming-patch)：更新队列、节流、重试与熔断设计参考
+- [xzq-xu/openclaw-plugin-feishu](https://github.com/xzq-xu/openclaw-plugin-feishu)：消息合并、历史、reaction 与发送者策略参考
+- [shareAI-lab/lark-channel](https://github.com/shareAI-lab/lark-channel)：latest-wins 队列、持久会话与可选 URL 操作按钮参考
+
+完整对标结论、已落实修复和后续优先级见 [GitHub 对标审计与路线图](docs/roadmap.md)。
 
 ## License
 
